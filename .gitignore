@@ -1,12 +1,36 @@
 node_modules/
 dist/
 .env
+.env.*
 vault/
 vault-test/
 *.log
 .DS_Store
 *.exe
 .bun-build
+*bun-build*
 model-health.json
 jarvis.json
 capitulo_terror.txt
+
+# Seguridad - NO subir tokens ni llaves
+*.key
+*.pem
+*.cert
+credentials*
+token*
+secret*
+apiKey*
+api_key*
+
+# Binarios compilados
+*.dll
+*.so
+*.dylib
+*.wasm
+
+# Cache y builds temporales
+.cache/
+tmp/
+temp/
+*.tsbuildinfo
