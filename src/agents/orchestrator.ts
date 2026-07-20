@@ -18,6 +18,7 @@ import { GraphLearner } from './graph-learner';
 import { buildSystemPrompt, buildSummarizePrompt } from './prompts';
 import { executeTool, executeToolsParallel } from './tools-executor';
 import { handleCommand, isSlashCommand } from './commands';
+import * as fileTools from '../tools/file';
 import { executeCommand } from '../tools/execute';
 import { sandboxedExec, getSandboxConfig, setSandboxMode, allowAll, addAllow } from '../tools/sandbox';
 import { loadSkills } from '../tools/skills';
@@ -173,7 +174,7 @@ export class Orchestrator {
 
     log.chat('message processed', { tokens: this.configStore.stats.tokens, model: this.currentModel, inputLen: input.length, outputLen: out.length });
 
-    this.vault.autoSave('context', `User: ${input.slice(0, 200)}\n\nJARVIS: ${out.slice(0, 500)}`);
+    this.vault.autoSave('context', `User: ${input.slice(0, 200)}\n\nULTRON: ${out.slice(0, 500)}`);
     this.session.record('chat', input.slice(0, 100), out.slice(0, 200));
     if (this.configStore.turnCount > 0 && this.configStore.turnCount % SUMMARIZE_EVERY === 0) this.autoSummary();
 
@@ -189,7 +190,7 @@ export class Orchestrator {
     }
     let msg = input;
     for (const f of files) {
-      try { const { readFile } = require('../tools/file'); msg += `\n[@${f}]:\n` + readFile(f, this.config.projectDir).slice(0, 1500); } catch {}
+      try { const content = fileTools.readFile(f, this.config.projectDir); msg += `\n[@${f}]:\n` + content.slice(0, 1500); } catch {}
     }
     return msg;
   }

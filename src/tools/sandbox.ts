@@ -51,9 +51,9 @@ export function checkCommand(command: string): { allowed: boolean; reason: strin
     }
   }
 
-  // Check allowlist
+  // Check allowlist (exact match only, no prefix matching)
   const cmdName = command.split(/\s+/)[0].toLowerCase();
-  if (config.allowlist.some(a => cmdName === a || cmdName.startsWith(a))) {
+  if (config.allowlist.includes(cmdName)) {
     return { allowed: true, reason: 'allowlist' };
   }
 

@@ -21,12 +21,12 @@ export function executeCommand(
       timeout,
       maxBuffer: 1024 * 1024,
       shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
-    }, (err, stdout, stderr) => {
+    },     (err, stdout, stderr) => {
       resolve({
         stdout: stdout || '',
         stderr: stderr || '',
         error: err ? err.message : null,
-        code: err ? (err as NodeJS.ErrnoException).code ? 1 : null : 0,
+        code: err && (err as NodeJS.ErrnoException).code ? 1 : err ? null : 0,
       });
     });
   });

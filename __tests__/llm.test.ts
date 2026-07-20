@@ -7,6 +7,8 @@ describe('LLM Providers', () => {
     delete process.env.DEEPSEEK_API_KEY;
     delete process.env.NVIDIA_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
+    delete process.env.DASHSCOPE_API_KEY;
+    delete process.env.DASHSCOPE_BASE_URL;
   });
 
   it('returns empty when no API keys', () => {

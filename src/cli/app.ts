@@ -7,6 +7,7 @@ import * as path from 'path';
 import { Orchestrator } from '../agents/orchestrator';
 import { loadEnv } from '../shared/utils';
 import { getProviders, getAllModels, getHealthyModelList, getModelsForHealthCheck } from '../llm/providers';
+import type { LLMProvider } from '../llm/types';
 import { runHealthCheck, getHealthSummary } from '../llm/health';
 import { analyzeDocument } from '../tools/document';
 import type { AgentEvent } from '../agents/types';
@@ -36,6 +37,18 @@ export async function runCLI(options: {
   const stats = orch.getStats();
 
   console.log(welcome(providers.map(p => p.name), orch.getCurrentModel(), stats.tokens, stats.requests, stats.history, getThemeName()));
+
+  // Validate API keys at startup
+  const keyResults = await validateKeys(providers);
+  const hasWorkingKey = keyResults.some(r => r.ok);
+  if (!hasWorkingKey) {
+    console.log(`\n  ${TC('warn')('⚠')} ${TC('dim')('Ninguna API key funciona:')}`);
+    for (const r of keyResults) {
+      console.log(`    ${TC('dim')(r.provider.padEnd(12))} ${r.ok ? TC('success')('✓') : TC('error')('✗')} ${r.error ? TC('dim')(r.error) : TC('success')('OK')}`);
+    }
+    console.log(`\n  ${TC('warn')('→')} ${TC('dim')('Ve a ') + TC('accent')('https://platform.deepseek.com') + TC('dim')(' y recarga tu cuenta o genera una nueva key.')}`);
+    console.log(`  ${TC('dim')('  O edita ') + TC('accent')('.env') + TC('dim')(' con una key valida.')}\n`);
+  }
 
   // Silent background health check (no startup delay)
   const modelsToCheck = getModelsForHealthCheck();
@@ -161,7 +174,8 @@ export async function runCLI(options: {
         }
         case 'install': case 'build': case 'test': case 'index': case 'cd': case 'say':
         case 'click': case 'type': case 'press': case 'screenshot': case 'mouse':
-        case 'model': case 'health': case 'graph': case 'stats': case 'allow': case 'clear': case 'verbose': case 'quiet': {
+        case 'model': case 'health': case 'graph': case 'stats': case 'allow': case 'clear': case 'verbose': case 'quiet':
+        case 'commit': case 'push': case 'diff': case 'log': case 'resume': {
           const r = await orch.handleMessage(input);
           console.log(formatSlashResponse(r));
           break;
@@ -238,3 +252,26 @@ async function repair(rl: readline.Interface, orch: Orchestrator, out: string, a
 import { getTheme } from './theme';
 import chalk from 'chalk';
 const TC = (key: keyof ReturnType<typeof getTheme>) => chalk.hex(getTheme()[key]);
+
+async function validateKeys(providers: LLMProvider[]): Promise<Array<{ provider: string; ok: boolean; error?: string }>> {
+  const results: Array<{ provider: string; ok: boolean; error?: string }> = [];
+  for (const p of providers) {
+    try {
+      const res = await fetch(`${p.baseURL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${p.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: p.defaultModel, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1, temperature: 0 }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) results.push({ provider: p.name, ok: true });
+      else {
+        let err = `HTTP ${res.status}`;
+        try { const body: any = await res.json(); if (body?.error?.message) err = body.error.message; } catch {}
+        results.push({ provider: p.name, ok: false, error: err });
+      }
+    } catch (e: unknown) {
+      results.push({ provider: p.name, ok: false, error: e instanceof Error ? e.message.slice(0, 80) : String(e).slice(0, 80) });
+    }
+  }
+  return results;
+}

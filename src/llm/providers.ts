@@ -9,6 +9,28 @@ function M(id: string, free = false): ModelEntry {
 export function getProviders(): LLMProvider[] {
   const providers: LLMProvider[] = [];
 
+  // AlibabaCloud Model Studio / DashScope (OpenAI compatible)
+  if (process.env.DASHSCOPE_API_KEY) {
+    providers.push({
+      name: 'alibaba',
+      baseURL: process.env.DASHSCOPE_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      apiKey: process.env.DASHSCOPE_API_KEY,
+      defaultModel: 'qwen-plus',
+      models: [
+        M('qwen-plus', false),
+        M('qwen-turbo', false),
+        M('qwen-max', false),
+        M('qwen3.7-plus', false),
+        M('qwen3.7-turbo', false),
+        M('qwen3.7-max', false),
+        M('qwen-coder-plus', false),
+        M('qwen-coder-turbo', false),
+        M('deepseek-r1', false),
+        M('deepseek-v3', false),
+      ],
+    });
+  }
+
   // DeepSeek API (primario, modelos baratos)
   if (process.env.DEEPSEEK_API_KEY) {
     providers.push({
@@ -107,7 +129,8 @@ export function getProvider(modelName?: string): LLMProvider | null {
     return providers.find(p => p.models.some(m => m.id === modelName)) || providers[0];
   }
 
-  return providers.find(p => p.name === 'deepseek')
+  return providers.find(p => p.name === 'alibaba')
+    || providers.find(p => p.name === 'deepseek')
     || providers.find(p => p.name === 'nvidia')
     || providers[0];
 }

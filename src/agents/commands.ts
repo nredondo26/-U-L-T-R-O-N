@@ -108,6 +108,30 @@ export async function handleCommand(
       const result = await installSpanishVoice();
       return { response: result };
     }
+    case 'commit': {
+      const msg = args || undefined;
+      const { gitAutoCommit } = await import('../tools/git-workflow');
+      const result = await gitAutoCommit(projectDir, msg);
+      return { response: result };
+    }
+    case 'push': {
+      const { autoCommitAndPush } = await import('../tools/git-workflow');
+      const result = await autoCommitAndPush(projectDir, args || undefined);
+      return { response: result };
+    }
+    case 'diff': {
+      const { gitDiff } = await import('../tools/git-workflow');
+      const result = await gitDiff(projectDir);
+      return { response: result };
+    }
+    case 'log': {
+      const { gitLog } = await import('../tools/git-workflow');
+      const result = await gitLog(projectDir, args ? parseInt(args) : 5);
+      return { response: result };
+    }
+    case 'resume': {
+      return { response: `Sesion restaurada. ${config.stats.history} mensajes en historial.\nUsa /history para verlos.` };
+    }
     case 'click': {
       const { mouseClick } = await import('../tools/automation');
       const btn = args || 'left';

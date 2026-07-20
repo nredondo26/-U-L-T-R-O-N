@@ -1,5 +1,5 @@
 // src/server/index.ts
-// Servidor web para J.A.R.V.I.S. v5 - interfaz grafica + WebSocket streaming
+// Web server for ULTRON v5 - web dashboard + streaming API
 
 import * as http from 'http';
 import * as fs from 'fs';
@@ -8,8 +8,6 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import { Orchestrator } from '../agents/orchestrator';
 import type { AgentEvent } from '../agents/types';
 import { getAllModels, getHealthyModelList } from '../llm/providers';
-
-const CLIENTS = new Set<(event: string, data: unknown) => void>();
 
 export function startWebServer(
   orchestrator: Orchestrator,
@@ -25,29 +23,16 @@ export function startWebServer(
       handleModels(req, res, orchestrator);
       return;
     }
+    if (req.url === '/api/models' && req.method === 'POST') {
+      handleSetModel(req, res, orchestrator);
+      return;
+    }
     if (req.url === '/api/status' && req.method === 'GET') {
       handleStatus(req, res, orchestrator);
       return;
     }
-    if (req.url === '/ws') {
-      handleWebSocket(req, res, orchestrator);
-      return;
-    }
     // Serve static files
     serveStatic(req, res);
-  });
-
-  // Send events to all WebSocket clients
-  orchestrator.setEventEmitter((event: AgentEvent) => {
-    for (const send of CLIENTS) {
-      send('event', event);
-    }
-  });
-
-  orchestrator.setStreamCallback((text: string) => {
-    for (const send of CLIENTS) {
-      send('stream', { content: text });
-    }
   });
 
   server.listen(port, '127.0.0.1', () => {
@@ -62,15 +47,48 @@ export function startWebServer(
 async function handleChat(req: IncomingMessage, res: ServerResponse, orch: Orchestrator) {
   try {
     const body = await readBody(req);
-    const { message } = JSON.parse(body);
+    const { message, model: requestedModel } = JSON.parse(body);
     if (!message) { res.writeHead(400); res.end('missing message'); return; }
 
+    if (requestedModel) orch.setCurrentModel(requestedModel);
+
+    // SSE streaming mode
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    // Send init
+    res.write(JSON.stringify({ type: 'init', model: orch.getCurrentModel(), stats: orch.getStats() }) + '\n');
+
+    let streamBuffer = '';
+
+    // Override callbacks for this request
+    const origEvent = (orch as any).onEvent;
+    const origStream = (orch as any).onStream;
+
+    (orch as any).onEvent = (event: AgentEvent) => {
+      res.write(JSON.stringify({ type: 'event', data: event }) + '\n');
+      if (event.type === 'done') res.write(JSON.stringify({ type: 'done' }) + '\n');
+    };
+
+    (orch as any).onStream = (text: string) => {
+      streamBuffer += text;
+      res.write(JSON.stringify({ type: 'stream', content: text }) + '\n');
+    };
+
     const response = await orch.handleMessage(message);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ response, model: orch.getCurrentModel(), tokens: orch.getStats() }));
+
+    // Restore
+    (orch as any).onEvent = origEvent;
+    (orch as any).onStream = origStream;
+
+    res.write(JSON.stringify({ type: 'result', response, model: orch.getCurrentModel(), tokens: orch.getStats() }) + '\n');
+    res.end();
   } catch (e: unknown) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+    res.write(`event: error\ndata: ${JSON.stringify({ error: e instanceof Error ? e.message : String(e) })}\n\n`);
+    res.end();
   }
 }
 
@@ -87,29 +105,22 @@ function handleModels(_req: IncomingMessage, res: ServerResponse, orch: Orchestr
   }));
 }
 
+async function handleSetModel(req: IncomingMessage, res: ServerResponse, orch: Orchestrator) {
+  try {
+    const body = await readBody(req);
+    const { model } = JSON.parse(body);
+    if (!model) { res.writeHead(400); res.end('missing model'); return; }
+    const ok = orch.setCurrentModel(model);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok, current: orch.getCurrentModel() }));
+  } catch {
+    res.writeHead(500); res.end('error');
+  }
+}
+
 function handleStatus(_req: IncomingMessage, res: ServerResponse, orch: Orchestrator) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ model: orch.getCurrentModel(), stats: orch.getStats() }));
-}
-
-function handleWebSocket(_req: IncomingMessage, res: ServerResponse, orch: Orchestrator) {
-  // Simulated WebSocket via SSE
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-
-  const send = (event: string, data: unknown) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
-
-  CLIENTS.add(send);
-  send('init', { model: orch.getCurrentModel(), stats: orch.getStats() });
-
-  res.on('close', () => {
-    CLIENTS.delete(send);
-  });
 }
 
 // ===== STATIC FILES =====

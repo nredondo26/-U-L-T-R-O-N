@@ -92,7 +92,7 @@ export async function testModel(
       return health;
     }
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401 || response.status === 402 || response.status === 403) {
       const health: ModelHealth = { status: 'unhealthy', latencyMs: ms, lastTested: new Date().toISOString(), error: `HTTP ${response.status}` };
       healthData.models[modelId] = health;
       return health;

@@ -67,8 +67,8 @@ export async function chatCompletion(
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
 
-      // Detect auth errors -> block entire provider
-      if (/401|403|invalid.*key|unauthorized|User not found/i.test(errMsg)) {
+      // Detect auth/balance errors -> block entire provider
+      if (/40[123]|invalid.*key|unauthorized|User not found|insufficient balance|insufficient_balance|payment.required/i.test(errMsg)) {
         blockedProviders.add(provider.name);
       }
 
@@ -94,7 +94,7 @@ export async function chatCompletion(
         continue;
       }
 
-      throw new Error(`Todos los modelos fallaron (${tried.size} intentos).\nVerifica tus API keys en .env:\n  DEEPSEEK_API_KEY\n  NVIDIA_API_KEY\n  OPENROUTER_API_KEY\n\nUltimo error: ${errMsg}`);
+      throw new Error(`Todos los modelos fallaron (${tried.size} intentos).\nVerifica tus API keys en .env:\n  DASHSCOPE_API_KEY\n  DEEPSEEK_API_KEY\n  NVIDIA_API_KEY\n  OPENROUTER_API_KEY\n\nUltimo error: ${errMsg}`);
     }
   }
 

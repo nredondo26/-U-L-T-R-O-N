@@ -41,7 +41,8 @@ function searchWithRg(
   maxResults = 50,
 ): SearchResult[] {
   try {
-    const args = ['--no-heading', '--line-number', '--max-count', String(maxResults), '-e', query];
+    const safeQuery = query.replace(/[;&|`$()]/g, '\\$&');
+    const args = ['--no-heading', '--line-number', '--max-count', String(maxResults), '-e', safeQuery];
     if (filePattern) args.unshift('--glob', filePattern);
 
     const output = execSync(`rg ${args.map(a => `"${a}"`).join(' ')}`, {
@@ -66,11 +67,11 @@ function searchWithBuiltin(
   filePattern?: string,
   maxResults = 50,
 ): SearchResult[] {
-  // Use findstr on Windows, grep on Unix
+  const safeQuery = query.replace(/[;&|`$()"]/g, '');
   const isWindows = process.platform === 'win32';
   const cmd = isWindows
-    ? `findstr /s /n /i /c:"${query}" ${filePattern || '*.*'}`
-    : `grep -rn "${query}" . ${filePattern ? `--include="${filePattern}"` : ''}`;
+    ? `findstr /s /n /i /c:"${safeQuery}" ${filePattern || '*.*'}`
+    : `grep -rn "${safeQuery}" . ${filePattern ? `--include="${filePattern}"` : ''}`;
 
   try {
     const output = execSync(cmd, { cwd: directory, timeout: 15000, maxBuffer: 1024 * 1024, encoding: 'utf8' });

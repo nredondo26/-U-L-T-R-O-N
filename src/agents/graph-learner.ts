@@ -179,7 +179,7 @@ export class GraphLearner {
   private buildEdges(nodes: GraphNode[], content: string): GraphEdge[] {
     const edges: GraphEdge[] = [];
     const fileNode = nodes.find(n => n.type === 'file');
-    const fileName = fileNode?.name || '';
+    const fileId = fileNode?.id || '';
 
     // Conectar todos los nodos al archivo que los contiene
     if (fileNode) {
@@ -197,7 +197,7 @@ export class GraphLearner {
         const fromMatch = imp.match(/from\s+['"](.+?)['"]/);
         if (fromMatch) {
           const importedFile = fromMatch[1];
-          edges.push({ source: `file_${fileName}`, target: `file_${importedFile}`, relation: 'imports' });
+          edges.push({ source: fileId, target: `file_${importedFile}`, relation: 'imports' });
         }
       }
     }

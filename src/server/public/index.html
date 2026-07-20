@@ -11,7 +11,10 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;hei
 .logo{font-weight:800;font-size:15px;color:var(--red);letter-spacing:2px}
 .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
-.header-stats{font-size:10px;color:var(--dim);margin-left:auto;display:flex;gap:16px}
+.model-select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;outline:none;cursor:pointer;max-width:200px}
+.model-select:focus{border-color:var(--red)}
+.model-select option{background:var(--surface);color:var(--text)}
+.header-stats{font-size:10px;color:var(--dim);margin-left:auto;display:flex;gap:16px;align-items:center}
 .header-stats span{color:var(--text)}
 .main{display:flex;flex:1;overflow:hidden}
 .chat-panel{width:380px;display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0}
@@ -35,6 +38,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;hei
 <div class="header">
   <span class="logo">ULTRON</span><div class="pulse"></div>
   <span style="font-size:11px;color:var(--dim)">command center</span>
+  <select class="model-select" id="modelSelect" onchange="switchModel(this.value)"><option value="">Loading models...</option></select>
   <span class="header-stats" id="headerStats"></span>
 </div>
 <div class="main">
@@ -65,6 +69,34 @@ const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
 let w,h;
 let files=[]; // flying files between agents
 let particles=[];
+
+async function loadModels(){
+  try{
+    const r=await fetch('/api/models');const d=await r.json();
+    const sel=document.getElementById('modelSelect');sel.innerHTML='';
+    const providers={};
+    for(const m of d.models){
+      if(!providers[m.provider])providers[m.provider]=[];
+      providers[m.provider].push(m);
+    }
+    for(const[prov,models] of Object.entries(providers)){
+      const grp=document.createElement('optgroup');grp.label=prov;
+      for(const m of models){
+        const opt=document.createElement('option');opt.value=m.model;
+        opt.textContent=(m.free?'★ ':'')+m.model+(m.healthy?'':' ⚠');
+        if(m.model===d.current)opt.selected=true;
+        grp.appendChild(opt);
+      }
+      sel.appendChild(grp);
+    }
+    model=d.current;updateStats();
+  }catch(e){console.error('Failed to load models',e)}
+}
+async function switchModel(modelId){
+  if(!modelId)return;
+  try{await fetch('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:modelId})});model=modelId;updateStats();}catch(e){console.error(e)}
+}
+loadModels();
 
 function resize(){w=canvas.parentElement.clientWidth;h=canvas.parentElement.clientHeight;canvas.width=w;canvas.height=h}
 window.addEventListener('resize',resize);resize();
@@ -209,32 +241,50 @@ function showTyping(show){
 async function send(){
   const input=document.getElementById('input');const text=input.value.trim();if(!text||isStreaming)return;
   input.value='';addMessage(text,'user');showTyping(true);isStreaming=true;
+  let lastAgent=null;
+
   try{
-    const es=new EventSource('/ws');
-    let lastAgent=null;
-    es.addEventListener('init',e=>{model=JSON.parse(e.data).model;updateStats()});
-    es.addEventListener('event',e=>{
-      const d=JSON.parse(e.data);
-      if(d.type==='action'){
-        const a=agents.find(x=>x.id===d.agent);
-        if(a){a.status='active';a.log=d.message.slice(0,30);a.count++;a.progress=0;
-          if(lastAgent!==null&&lastAgent!==agents.indexOf(a))sendFile(lastAgent,agents.indexOf(a));
-          lastAgent=agents.indexOf(a);
-        }
-      }else if(d.type==='done'){
-        const a=agents.find(x=>x.id===d.agent);
-        if(a){a.status='idle';a.log='completed ✓';a.progress=100}
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,model:model})});
+    const reader=r.body.getReader();const decoder=new TextDecoder();
+    let leftover='';
+
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      leftover+=decoder.decode(value,{stream:true});
+      const lines=leftover.split('\n');leftover=lines.pop()||'';
+
+      for(const line of lines){
+        if(!line.trim())continue;
+        try{
+          const d=JSON.parse(line);
+
+          if(d.type==='init'){model=d.model;updateStats()}
+          else if(d.type==='stream'){
+            if(!streamMsg){streamMsg=addMessage('','ai');showTyping(false)}
+            streamMsg.innerHTML+=d.content.replace(/\n/g,'<br>');streamMsg.scrollIntoView(false);
+            for(const a of agents){a.status='idle';a.progress=0;if(!a.log.includes('✓'))a.log='idle'}
+            lastAgent=null;
+          }
+          else if(d.type==='event'&&d.data){
+            const ev=d.data;
+            if(ev.type==='action'){
+              const a=agents.find(x=>x.id===ev.agent);
+              if(a){a.status='active';a.log=ev.message.slice(0,30);a.count++;a.progress=0;
+                if(lastAgent!==null&&lastAgent!==agents.indexOf(a))sendFile(lastAgent,agents.indexOf(a));
+                lastAgent=agents.indexOf(a);
+              }
+            }else if(ev.type==='done'){
+              const a=agents.find(x=>x.id===ev.agent);
+              if(a){a.status='idle';a.log='completed ✓';a.progress=100}
+            }else if(ev.type==='thought'){
+              const a=agents.find(x=>x.id===ev.agent);
+              if(a)a.status='active';
+            }
+          }
+          else if(d.type==='result'){tokens=d.tokens?.tokens||0;updateStats();streamMsg=null}
+        }catch(e){}
       }
-    });
-    es.addEventListener('stream',e=>{
-      if(!streamMsg){streamMsg=addMessage('','ai');showTyping(false)}
-      streamMsg.innerHTML+=JSON.parse(e.data).content.replace(/\n/g,'<br>');streamMsg.scrollIntoView(false);
-      for(const a of agents){a.status='idle';a.progress=0;if(!a.log.includes('✓'))a.log='idle'}
-      lastAgent=null;
-    });
-    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});
-    es.close();const data=await r.json();
-    if(data.tokens){tokens=data.tokens.tokens;updateStats()}streamMsg=null
+    }
   }catch(e){showTyping(false);addMessage('Error: '+e.message,'ai')}
   isStreaming=false;updateStats()
 }
