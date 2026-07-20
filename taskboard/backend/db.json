@@ -1,0 +1,32 @@
+{
+  "tasks": [
+    {
+      "id": "2",
+      "title": "Diseñar la interfaz de usuario",
+      "description": "Crear los componentes principales con React",
+      "status": "in-progress",
+      "createdAt": "2026-07-20T11:00:00.000Z"
+    },
+    {
+      "id": "3",
+      "title": "Implementar API REST",
+      "description": "Crear endpoints CRUD para las tareas",
+      "status": "pending",
+      "createdAt": "2026-07-20T12:00:00.000Z"
+    },
+    {
+      "id": "ef1b972c-3ff1-464a-83b3-dd2352e475ee",
+      "title": "Tarea desde ULTRON",
+      "description": "Creada por mi agente Basher",
+      "status": "pending",
+      "createdAt": "2026-07-20T16:58:15.236Z"
+    },
+    {
+      "id": "0366f08f-5beb-460c-8a97-598054fd6806",
+      "title": "prueba",
+      "description": "prueba",
+      "status": "pending",
+      "createdAt": "2026-07-20T16:58:35.488Z"
+    }
+  ]
+}

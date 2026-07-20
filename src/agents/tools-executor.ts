@@ -19,6 +19,7 @@ import { BasherAgent } from './basher';
 import { ResearcherAgent } from './researcher';
 import { ThinkerAgent } from './thinker';
 import { ReviewerAgent } from './reviewer';
+import { ArchitectAgent } from './architect';
 
 const MAX_RETRIES = 2;
 
@@ -32,13 +33,14 @@ export async function executeTool(
   researcher?: ResearcherAgent,
   thinker?: ThinkerAgent,
   reviewer?: ReviewerAgent,
+  architect?: ArchitectAgent,
 ): Promise<{ result: string; retries: number }> {
   let lastError = '';
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const result = await executeToolOnce(
         name, args, projectDir,
-        editor, librarian, basher, researcher, thinker, reviewer,
+        editor, librarian, basher, researcher, thinker, reviewer, architect,
       );
       return { result, retries: attempt };
     } catch (e: unknown) {
@@ -61,6 +63,7 @@ async function executeToolOnce(
   researcher?: ResearcherAgent,
   thinker?: ThinkerAgent,
   reviewer?: ReviewerAgent,
+  architect?: ArchitectAgent,
 ): Promise<string> {
   switch (name) {
     case 'delegate_editor': {
@@ -92,6 +95,11 @@ async function executeToolOnce(
     case 'delegate_reviewer': {
       if (!reviewer) throw new Error('Reviewer no disponible');
       return reviewer.review(args.content as string, args.context as string | undefined);
+    }
+    case 'delegate_architect': {
+      if (!architect) throw new Error('Architect no disponible');
+      const plan = await architect.createPlan(args.task as string || '');
+      return architect.formatPlan(plan);
     }
     case 'vault_save':
       return `Nota "${args.name}" lista para guardar.`;

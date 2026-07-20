@@ -1,0 +1,251 @@
+/* === Reset y base === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  min-height: 100vh;
+}
+
+/* === Layout principal === */
+.app-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.app-title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #16213e;
+  margin-bottom: 2rem;
+  letter-spacing: -0.5px;
+}
+
+.app-title span {
+  color: #0f3460;
+}
+
+/* === Formulario === */
+.task-form {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.task-form input,
+.task-form textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.task-form input:focus,
+.task-form textarea:focus {
+  outline: none;
+  border-color: #0f3460;
+}
+
+.task-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.task-form button {
+  padding: 0.75rem 1.5rem;
+  background: #0f3460;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  align-self: flex-end;
+}
+
+.task-form button:hover {
+  background: #16213e;
+}
+
+.task-form button:disabled {
+  background: #a0a0a0;
+  cursor: not-allowed;
+}
+
+/* === Lista de tareas === */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.task-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  transition: box-shadow 0.2s;
+}
+
+.task-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.task-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #16213e;
+  margin-bottom: 0.25rem;
+}
+
+.task-card-desc {
+  font-size: 0.875rem;
+  color: #555;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.task-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.task-status {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.task-status.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.task-status.in-progress {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.task-status.done {
+  background: #d4edda;
+  color: #155724;
+}
+
+.task-date {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+/* === Acciones de tarea === */
+.task-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.btn-action {
+  padding: 0.35rem 0.7rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-action:hover {
+  opacity: 0.8;
+}
+
+.btn-status {
+  background: #e8e8e8;
+  color: #333;
+}
+
+.btn-delete {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* === Estados vacío y carga === */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #888;
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state .sub {
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #888;
+  font-size: 1rem;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+/* === Responsive === */
+@media (max-width: 600px) {
+  .app-container {
+    padding: 1rem 0.75rem;
+  }
+
+  .app-title {
+    font-size: 1.5rem;
+  }
+
+  .task-card {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .task-actions {
+    align-self: flex-end;
+  }
+}

@@ -51,7 +51,7 @@ export function startWebServer(
   });
 
   server.listen(port, '127.0.0.1', () => {
-    console.log(`\n  ULTRON v5 Web UI: http://127.0.0.1:${port}\n`);
+    console.log(`\n  Dashboard: http://127.0.0.1:${port}/dashboard.html\n`);
   });
 
   return server;

@@ -151,10 +151,12 @@ describe('Functional: File operations', () => {
 
 describe('Functional: Sandbox', () => {
   it('sandbox blocks dangerous commands', async () => {
-    const { checkCommand } = await import('../src/tools/sandbox');
+    const { checkCommand, setSandboxMode } = await import('../src/tools/sandbox');
+    setSandboxMode('deny'); // Reset any leaked state
     const result = checkCommand('rm -rf /');
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain('bloqueado');
+    setSandboxMode('ask');
   });
 
   it('sandbox allows safe commands', async () => {

@@ -29,7 +29,7 @@ export async function handleCommand(
 
   switch (cmd) {
     case 'help': return { response: helpText() };
-    case 'new':
+    case 'new': case 'clear':
       clearHistory(); session.clear();
       config.setChatHistory([]); config.resetTurnCount();
       return { response: 'Nueva conversacion iniciada.' };
@@ -48,6 +48,31 @@ export async function handleCommand(
         return { response: `No encontrado: ${args}` };
       }
       return { response: listModels(currentModel) };
+    }
+    case 'model': {
+      if (!args) return { response: `Modelo actual: ${currentModel}\nUsa /model <id> para cambiar o /models para ver lista.` };
+      if (setModel(args)) return { response: `Modelo: ${args}` };
+      const models = getAllModels();
+      const match = models.find(m => m.model.includes(args) || m.model.toLowerCase().includes(args.toLowerCase()));
+      if (match) { setModel(match.model); return { response: `Modelo: ${match.model}` }; }
+      return { response: `No encontrado: ${args}. Usa /models para ver disponibles.` };
+    }
+    case 'health': {
+      const { getHealthSummary } = await import('../llm/health');
+      const h = getHealthSummary();
+      return { response: `Health: ${h.healthy} healthy, ${h.unhealthy} down de ${h.total} total\nUltimo check: ${h.lastCheck || 'nunca'}` };
+    }
+    case 'graph': {
+      return { response: `Grafo de conocimiento:\n${vault.getGraph().nodes.length} nodos, ${vault.getGraph().edges.length} conexiones\nUsa /vault para ver notas.` };
+    }
+    case 'stats': case 'tokens': {
+      return { response: `Tokens: ${config.stats.tokens.toLocaleString()} | Requests: ${config.stats.requests} | Turnos: ${config.stats.turns} | Historial: ${config.stats.history} msgs` };
+    }
+    case 'allow': {
+      if (!args) return { response: 'Uso: /allow <comando> (ej: /allow python)' };
+      const { addAllow } = await import('../tools/sandbox');
+      addAllow(args);
+      return { response: `Comando "${args}" agregado a la allowlist del sandbox.` };
     }
     case 'vault': {
       const notes = vault.listNotes();
@@ -191,21 +216,32 @@ function detectTestCommand(dir: string): CommandResult {
 function helpText(): string {
   return `ULTRON v5 — Comandos:
   /help            - Esta ayuda
-  /new             - Nueva conversacion
+  /new /clear      - Nueva conversacion (limpiar historial)
   /history         - Historial reciente
-  /models          - Listar modelos LLM
-  /models <id>     - Seleccionar modelo
+  /model <id>      - Cambiar modelo de IA
+  /models          - Listar todos los modelos disponibles
+  /health          - Estado de salud de los modelos
+  /stats /tokens   - Estadisticas de uso
   /vault           - Notas en vault
-  /vault:search <q>- Buscar notas
+  /vault:search <q>- Buscar notas en memoria
+  /graph           - Grafo de conocimiento
   /install         - Instalar dependencias (npm/pip/cargo/go)
   /build           - Compilar proyecto
   /test            - Ejecutar tests
-  /index           - Indexar proyecto en grafo (reduce tokens)
+  /index           - Indexar proyecto en grafo
   /browse <url>    - Abrir URL en navegador
-  /open <app>      - Abrir app (code, notepad, explorer .)  
+  /open <app>      - Abrir app (code, notepad, explorer)
+  /sandbox <mode>  - Modo sandbox (ask/allow/deny/allow-all)
+  /allow <cmd>     - Agregar comando a allowlist
+  /click /type /press - Automatizacion mouse/teclado
+  /screenshot      - Capturar pantalla
+  /say <texto>     - Hablar por voz
+  /voices          - Listar voces disponibles
+  /voice-install   - Instalar voces en espanol
+  /cd <dir>        - Cambiar directorio de trabajo
+  /logs            - Ver logs recientes
   /status          - Estado del sistema
-  /tokens          - Tokens consumidos
-  /init            - Crear knowledge.md del proyecto
+  /init            - Crear knowledge.md
   /exit            - Salir
 
 Atajos:

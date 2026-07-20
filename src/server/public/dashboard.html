@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ULTRON — Agent Dashboard</title>
+<style>
+:root{--bg:#060608;--card:#0d0d14;--border:#1a1a2e;--red:#ef4444;--green:#10b981;--blue:#3b82f6;--yellow:#f59e0b;--purple:#8b5cf6;--cyan:#06b6d4;--text:#c8d0e0;--dim:#4a5570}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;height:100vh;overflow:hidden}
+.header{display:flex;align-items:center;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--border);gap:16px}
+.logo{font-weight:800;font-size:18px;color:var(--red);letter-spacing:2px}
+.status{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:12px;color:var(--dim)}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.main{display:grid;grid-template-columns:1fr 280px;height:calc(100vh - 53px)}
+.agents{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;align-content:start;overflow-y:auto}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;transition:.2s;position:relative}
+.card.active{border-color:var(--green);box-shadow:0 0 20px rgba(16,185,129,.15)}
+.card.error{border-color:var(--red)}
+.card.thinking{border-color:var(--yellow);animation:glow 1.5s ease-in-out infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 10px rgba(245,158,11,.1)}50%{box-shadow:0 0 25px rgba(245,158,11,.25)}}
+.card-icon{font-size:28px;margin-bottom:6px}
+.card-name{font-weight:700;font-size:13px;margin-bottom:4px}
+.card-status{font-size:10px;color:var(--dim);margin-bottom:6px}
+.card-action{font-size:9px;color:var(--dim);height:28px;overflow:hidden;text-overflow:ellipsis}
+.bar{height:3px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width .3s}
+/* SIDEBAR */
+.sidebar{background:var(--card);border-left:1px solid var(--border);padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.sidebar h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
+.event{font-size:10px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.02);display:flex;gap:8px;align-items:flex-start}
+.event .dot{width:6px;height:6px;border-radius:50%;margin-top:3px;flex-shrink:0}
+.event .agent-name{color:var(--yellow);font-weight:600;white-space:nowrap}
+.event .event-msg{color:var(--dim)}
+.event .time{font-size:8px;color:var(--dim);margin-left:auto;white-space:nowrap}
+.stats{display:flex;gap:12px;font-size:11px;color:var(--dim)}
+.stats span{color:var(--text)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="logo">ULTRON</span>
+  <span class="status"><div class="pulse"></div> agents active</span>
+  <span class="stats" id="topStats"></span>
+</div>
+
+<div class="main">
+<div class="agents" id="agents"></div>
+<div class="sidebar">
+  <h3>Live Activity</h3>
+  <div id="events"></div>
+</div>
+</div>
+
+<script>
+const AGENTS = [
+  { id:'Orchestrator', icon:'◆', color:'#ef4444', desc:'Coordinator' },
+  { id:'Architect', icon:'◈', color:'#f59e0b', desc:'Planner' },
+  { id:'Editor', icon:'✎', color:'#10b981', desc:'Code' },
+  { id:'Librarian', icon:'◉', color:'#3b82f6', desc:'Analysis' },
+  { id:'Basher', icon:'⬢', color:'#8b5cf6', desc:'Terminal' },
+  { id:'Researcher', icon:'◇', color:'#06b6d4', desc:'Web' },
+  { id:'Thinker', icon:'◎', color:'#f59e0b', desc:'Strategy' },
+  { id:'Reviewer', icon:'○', color:'#f59e0b', desc:'Review' },
+];
+
+const state = {};
+let tokens = 0, model = '';
+
+// Build cards
+const agentsDiv = document.getElementById('agents');
+for (const a of AGENTS) {
+  state[a.id] = { status:'idle', action:'', count:0 };
+  const div = document.createElement('div');
+  div.className = 'card'; div.id = 'card-' + a.id;
+  div.innerHTML = `
+    <div class="card-icon" style="color:${a.color}">${a.icon}</div>
+    <div class="card-name">${a.id}</div>
+    <div class="card-status">${a.desc}</div>
+    <div class="card-action">idle</div>
+    <div class="bar"><div class="bar-fill" style="width:0%;background:${a.color}"></div></div>
+    <div style="font-size:8px;color:var(--dim);margin-top:4px">actions: <span id="cnt-${a.id}">0</span></div>
+  `;
+  agentsDiv.appendChild(div);
+}
+
+function setAgent(agent, status, action) {
+  const s = state[agent];
+  s.status = status;
+  if (action) s.action = action.slice(0, 60);
+  if (status === 'active') s.count++;
+  const card = document.getElementById('card-' + agent);
+  if (!card) return;
+  card.className = 'card ' + (status === 'active' ? 'thinking' : status === 'error' ? 'error' : status === 'done' ? 'active' : '');
+  card.querySelector('.card-action').textContent = status === 'active' ? s.action || 'working...' : status;
+  card.querySelector('.bar-fill').style.width = status === 'active' ? '60%' : status === 'done' ? '100%' : '0%';
+  document.getElementById('cnt-' + agent).textContent = s.count;
+}
+
+function addEvent(agent, msg, color) {
+  const evDiv = document.getElementById('events');
+  const div = document.createElement('div');
+  div.className = 'event';
+  const now = new Date().toTimeString().slice(0,8);
+  div.innerHTML = `<div class="dot" style="background:${color || '#f59e0b'}"></div><span class="agent-name">${agent}</span><span class="event-msg">${msg.slice(0,80)}</span><span class="time">${now}</span>`;
+  evDiv.prepend(div);
+  if (evDiv.children.length > 50) evDiv.lastChild.remove();
+}
+
+function updateStats() {
+  document.getElementById('topStats').innerHTML = `<span>${model}</span> · tokens <span>${tokens.toLocaleString()}</span>`;
+}
+
+// SSE connection
+const es = new EventSource('/ws');
+es.addEventListener('init', e => {
+  const d = JSON.parse(e.data);
+  model = d.model || '?';
+  updateStats();
+});
+es.addEventListener('event', e => {
+  const d = JSON.parse(e.data);
+  if (d.type === 'action') {
+    setAgent(d.agent, 'active', d.message);
+    addEvent(d.agent, d.message, AGENTS.find(a=>a.id===d.agent)?.color);
+  } else if (d.type === 'done') {
+    setAgent(d.agent, 'done', '');
+  } else if (d.type === 'thought') {
+    setAgent(d.agent, 'active', 'thinking...');
+  }
+});
+es.addEventListener('stream', e => {
+  const d = JSON.parse(e.data);
+  // Reset all to idle when streaming starts
+  for (const a of AGENTS) setAgent(a.id, 'idle', '');
+});
+es.addEventListener('error', () => {
+  for (const a of AGENTS) setAgent(a.id, 'error', 'connection lost');
+});
+</script>
+</body>
+</html>

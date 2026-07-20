@@ -32,7 +32,7 @@ export async function runCLI(options: {
   const projectDir = options.projectDir || process.cwd();
   const vaultDir = options.vaultDir || path.join(projectDir, 'vault');
   const providers = getProviders();
-  const orch = new Orchestrator({ projectDir, vaultDir, maxSteps: 10, verbose: true });
+  const orch = new Orchestrator({ projectDir, vaultDir, maxSteps: 25, verbose: true });
   const stats = orch.getStats();
 
   console.log(welcome(providers.map(p => p.name), orch.getCurrentModel(), stats.tokens, stats.requests, stats.history, getThemeName()));
@@ -46,16 +46,21 @@ export async function runCLI(options: {
 
   let spinner: Spinner | null = null;
   let wasStreamed = false;
+  let verboseMode = true; // Show agent activity by default
 
   orch.setEventEmitter((event: AgentEvent) => {
     if (event.type === 'thought') {
       if (spinner) spinner.updateMessage(event.message);
       else { spinner = new Spinner(event.agent, event.message); spinner.start(); }
     } else if (event.type === 'action') {
-      // Just update spinner, don't interrupt
-      if (spinner) spinner.updateMessage(event.data
-        ? `${String((event.data as Record<string,unknown>).command || (event.data as Record<string,unknown>).task || (event.data as Record<string,unknown>).filePath || '')}`.slice(0, 40)
-        : event.message);
+      if (spinner) { spinner.stop(); spinner = null; }
+      if (verboseMode) {
+        const label = event.data
+          ? String((event.data as Record<string,unknown>).command || (event.data as Record<string,unknown>).task || (event.data as Record<string,unknown>).filePath || event.message).slice(0, 50)
+          : event.message;
+        process.stdout.write(`  ${TC('dim')('[')}${TC('accent')(event.agent.slice(0,8))}${TC('dim')(']')} ${TC('dim')(label)}\n`);
+      }
+      spinner = new Spinner(event.agent, event.message); spinner.start();
     } else if (event.type === 'done') {
       if (spinner) { spinner.stop(); spinner = null; }
     }
@@ -133,6 +138,16 @@ export async function runCLI(options: {
             console.log('    themes: ' + listThemes().join(', '));
           } break;
         }
+        case 'verbose': {
+          verboseMode = !verboseMode;
+          console.log(`    verbose: ${verboseMode ? 'ON (shows agent activity)' : 'OFF (quiet mode)'}`);
+          break;
+        }
+        case 'quiet': {
+          verboseMode = false;
+          console.log('    quiet mode ON');
+          break;
+        }
         case 'init': {
           busy = true; wasStreamed = false; spinner = null;
           console.log('\n' + hr());
@@ -145,10 +160,16 @@ export async function runCLI(options: {
           busy = false; break;
         }
         case 'install': case 'build': case 'test': case 'index': case 'cd': case 'say':
-        case 'click': case 'type': case 'press': case 'screenshot': case 'mouse': {
+        case 'click': case 'type': case 'press': case 'screenshot': case 'mouse':
+        case 'model': case 'health': case 'graph': case 'stats': case 'allow': case 'clear': case 'verbose': case 'quiet': {
           const r = await orch.handleMessage(input);
           console.log(formatSlashResponse(r));
-          if (['install','build','test'].includes(cmd)) await repair(rl, orch, r, cmd, input, wasStreamed);
+          break;
+        }
+        case 'dashboard': {
+          const { exec } = await import('child_process');
+          exec('start http://127.0.0.1:3456/dashboard.html');
+          console.log('    opening agent dashboard...');
           break;
         }
         case 'browse': case 'open':

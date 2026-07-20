@@ -40,7 +40,7 @@ Options:
   if (webMode) {
     // Web-only mode
     loadEnv(envFile);
-    const orch = new Orchestrator({ projectDir, vaultDir, maxSteps: 10, verbose: false });
+    const orch = new Orchestrator({ projectDir, vaultDir, maxSteps: 25, verbose: false });
     startWebServer(orch, webPort);
     console.log(`J.A.R.V.I.S. v5 Web UI running on http://127.0.0.1:${webPort}`);
   } else {

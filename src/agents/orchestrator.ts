@@ -13,6 +13,7 @@ import { BasherAgent } from './basher';
 import { ResearcherAgent } from './researcher';
 import { ThinkerAgent } from './thinker';
 import { ReviewerAgent } from './reviewer';
+import { ArchitectAgent } from './architect';
 import { GraphLearner } from './graph-learner';
 import { buildSystemPrompt, buildSummarizePrompt } from './prompts';
 import { executeTool, executeToolsParallel } from './tools-executor';
@@ -61,6 +62,7 @@ export class Orchestrator {
   private researcher: ResearcherAgent;
   private thinker: ThinkerAgent;
   private reviewer: ReviewerAgent;
+  private architect: ArchitectAgent;
   private graphLearner: GraphLearner;
   private onEvent?: (event: AgentEvent) => void;
   private onStream?: (text: string) => void;
@@ -77,6 +79,7 @@ export class Orchestrator {
     this.researcher = new ResearcherAgent();
     this.thinker = new ThinkerAgent();
     this.reviewer = new ReviewerAgent();
+    this.architect = new ArchitectAgent();
     this.graphLearner = new GraphLearner(this.vault, config.projectDir);
 
     const saved = this.configStore.currentModel;
@@ -194,7 +197,7 @@ export class Orchestrator {
   private async runTool(name: string, args: Record<string, unknown>): Promise<{ result: string; retries: number }> {
     this.emit({ type: 'action', agent: agentForTool(name), message: toolLabel(name, args), data: args });
     log.tool(name, args, 'executing');
-    const { result, retries } = await executeTool(name, args, this.config.projectDir, this.editor, this.librarian, this.basher, this.researcher, this.thinker, this.reviewer);
+    const { result, retries } = await executeTool(name, args, this.config.projectDir, this.editor, this.librarian, this.basher, this.researcher, this.thinker, this.reviewer, this.architect);
     if (name === 'vault_save') this.vault.writeNote(args.name as string, args.content as string);
     log.tool(name, args, result.slice(0, 200));
     return { result, retries };
@@ -220,6 +223,7 @@ export class Orchestrator {
       d('delegate_researcher', 'Researcher: busca en web', { task: { type: 'string' } }, ['task']),
       d('delegate_thinker', 'Thinker: planifica tareas', { task: { type: 'string' } }, ['task']),
       d('delegate_reviewer', 'Reviewer: revisa codigo', { content: { type: 'string' }, context: { type: 'string' } }, ['content']),
+      d('delegate_architect', 'Architect: planifica proyectos grandes con fases y pasos', { task: { type: 'string' } }, ['task']),
       d('vault_save', 'Guarda nota en vault', { name: { type: 'string' }, content: { type: 'string' } }, ['name', 'content']),
       d('direct_execute', 'Ejecuta comando', { command: { type: 'string' } }, ['command']),
       d('direct_search', 'Busca en web', { query: { type: 'string' } }, ['query']),
