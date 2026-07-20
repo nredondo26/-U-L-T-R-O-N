@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+vault/
+vault-test/
+*.log
+.DS_Store
+*.exe
+.bun-build
+model-health.json
+jarvis.json
+capitulo_terror.txt

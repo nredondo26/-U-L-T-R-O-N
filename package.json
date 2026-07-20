@@ -1,0 +1,38 @@
+{
+  "name": "ultron",
+  "version": "5.0.0",
+  "description": "ULTRON - Neural Intelligence Platform (multi-agent CLI)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "web": "bun run src/index.ts --web",
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "start": "bun run dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "compile": "bun build src/index.ts --compile --outfile dist/ultron.exe --target bun-windows-x64",
+    "compile:node": "bun build src/index.ts --compile --outfile dist/ultron.exe --target node-windows-x64"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "mammoth": "^1.12.0",
+    "openai": "^5.6.0",
+    "pdf-parse": "^2.4.5",
+    "xlsx": "^0.18.5",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.11",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/pino": "^7.0.5",
+    "bun-types": "1.3.14",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  }
+}
