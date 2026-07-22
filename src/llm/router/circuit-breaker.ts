@@ -107,4 +107,12 @@ export class CircuitBreaker {
       models: Object.fromEntries(this.models),
     };
   }
+
+  preBlock(model: string): void {
+    this.models.set(model, { locked: true, lockedAt: Date.now(), failCount: 3 });
+  }
+
+  preUnblock(model: string): void {
+    this.models.set(model, { locked: false, lockedAt: null, failCount: 0 });
+  }
 }

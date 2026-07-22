@@ -62,8 +62,14 @@ STEP 2|agent|descripcion
     const stepRegex = /STEP\s+(\d+)\|(\w+)\|(.+)/gi;
     const steps: Array<{ step: string; agent: string; description: string }> = [];
     let m;
+    const validAgents = new Set(['editor', 'librarian', 'basher', 'researcher', 'thinker', 'reviewer', 'architect']);
     while ((m = stepRegex.exec(text)) !== null) {
-      steps.push({ step: m[1], agent: m[2].toLowerCase(), description: m[3].trim() });
+      const agent = m[2].toLowerCase();
+      steps.push({ step: m[1], agent: validAgents.has(agent) ? agent : 'orchestrator', description: m[3].trim() });
+    }
+
+    if (steps.length === 0) {
+      steps.push({ step: '1', agent: 'thinker', description: userMessage.slice(0, 100) });
     }
 
     return { summary, steps };

@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ObsidianVault } from '../memory/vault';
 import * as fileTools from '../tools/file';
+import { log } from '../shared/logger';
 
 interface GraphNode {
   id: string;
@@ -31,33 +32,34 @@ export class GraphLearner {
     this.projectDir = projectDir;
   }
 
-  // Indexa un archivo: extrae funciones, clases, imports y crea notas enlazadas
   async indexFile(filePath: string): Promise<{ nodes: number; edges: number }> {
     try {
       const content = fileTools.readFile(filePath, this.projectDir);
       const ext = path.extname(filePath);
 
-      // Extraer definiciones basicas (clases, funciones, imports)
       const nodes = this.extractDefinitions(content, filePath, ext);
       const edges = this.buildEdges(nodes, content);
 
-      // Crear nota para cada nodo
       for (const node of nodes) {
         const nodeContent = this.buildNodeNote(node);
         this.vault.writeNote(this.slugify(node.id), nodeContent);
       }
 
-      // Crear nota del archivo con links a sus nodos
       const fileNote = this.buildFileNote(filePath, nodes, content);
       this.vault.writeNote(this.slugify('file_' + filePath), fileNote);
 
+      const edgeContent = this.buildEdgeNotes(edges);
+      if (edgeContent) {
+        this.vault.writeNote(this.slugify('edges_' + filePath), edgeContent);
+      }
+
       return { nodes: nodes.length, edges: edges.length };
-    } catch {
+    } catch (e: unknown) {
+      log.warn('graph-learner: indexFile error', { error: e instanceof Error ? e.message : String(e), file: filePath });
       return { nodes: 0, edges: 0 };
     }
   }
 
-  // Indexa todo el proyecto
   async indexProject(): Promise<{ files: number; nodes: number }> {
     const files = fileTools.listFiles('.', this.projectDir, 5)
       .filter(f => /\.(ts|tsx|js|jsx|py|kt|java|rs|go)$/.test(f));
@@ -71,12 +73,10 @@ export class GraphLearner {
     return { files: files.length, nodes: totalNodes };
   }
 
-  // Busca contexto relevante en el grafo para una consulta
   searchGraph(query: string, maxResults = 10): string[] {
     const notes = this.vault.searchNotes(query);
     if (notes.length === 0) return [];
 
-    // Recorrer el grafo: por cada nota encontrada, seguir sus links (1 nivel)
     const visited = new Set<string>();
     const results: string[] = [];
 
@@ -84,11 +84,9 @@ export class GraphLearner {
       if (visited.has(note.name)) continue;
       visited.add(note.name);
 
-      // Agregar la nota
       results.push(`- [[${note.name}]]: ${note.excerpt}`);
 
-      // Seguir links
-      for (const link of note.links.slice(0, 5)) {
+      for (const link of note.links.slice(0, 10)) {
         const cleanLink = link.split('|')[0].trim();
         if (!visited.has(cleanLink)) {
           visited.add(cleanLink);
@@ -103,11 +101,9 @@ export class GraphLearner {
     return results.slice(0, maxResults);
   }
 
-  // Construye contexto de grafo para inyectar en el system prompt
   buildGraphContext(query: string): string {
     const results = this.searchGraph(query);
     if (results.length === 0) {
-      // Si no hay resultados, sugerir indexar
       const indexNotes = this.vault.searchNotes('file_');
       if (indexNotes.length === 0) {
         return '(grafo vacio — usa /index para analizar el proyecto)';
@@ -124,7 +120,6 @@ export class GraphLearner {
     const lines = content.split('\n');
     const fileName = path.basename(filePath);
 
-    // Nodo del archivo
     nodes.push({
       id: `file_${filePath}`,
       type: 'file',
@@ -134,12 +129,10 @@ export class GraphLearner {
       tags: ['file', ext.replace('.', '')],
     });
 
-    // Buscar definiciones segun lenguaje
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
 
       if (/\.(ts|tsx|js|jsx)$/.test(ext)) {
-        // TypeScript/JavaScript
         const classMatch = line.match(/(?:export\s+)?(?:abstract\s+)?class\s+(\w+)/);
         if (classMatch) {
           nodes.push({ id: `class_${classMatch[1]}`, type: 'class', name: classMatch[1], file: filePath, summary: `class ${classMatch[1]} (linea ${i + 1})`, tags: ['class'] });
@@ -171,6 +164,21 @@ export class GraphLearner {
           nodes.push({ id: `func_${funcMatch[1]}`, type: 'function', name: funcMatch[1], file: filePath, summary: `def ${funcMatch[1]} (linea ${i + 1})`, tags: ['function', 'python'] });
         }
       }
+
+      if (ext === '.kt') {
+        const classMatch = line.match(/(?:data\s+)?class\s+(\w+)/);
+        if (classMatch) {
+          nodes.push({ id: `class_${classMatch[1]}`, type: 'class', name: classMatch[1], file: filePath, summary: `class ${classMatch[1]} (linea ${i + 1})`, tags: ['class', 'kotlin'] });
+        }
+        const funcMatch = line.match(/(?:suspend\s+)?fun\s+(\w+)/);
+        if (funcMatch) {
+          nodes.push({ id: `func_${funcMatch[1]}`, type: 'function', name: funcMatch[1], file: filePath, summary: `fun ${funcMatch[1]} (linea ${i + 1})`, tags: ['function', 'kotlin'] });
+        }
+        const ifaceMatch = line.match(/interface\s+(\w+)/);
+        if (ifaceMatch) {
+          nodes.push({ id: `interface_${ifaceMatch[1]}`, type: 'class', name: ifaceMatch[1], file: filePath, summary: `interface ${ifaceMatch[1]} (linea ${i + 1})`, tags: ['interface', 'kotlin'] });
+        }
+      }
     }
 
     return nodes;
@@ -181,7 +189,6 @@ export class GraphLearner {
     const fileNode = nodes.find(n => n.type === 'file');
     const fileId = fileNode?.id || '';
 
-    // Conectar todos los nodos al archivo que los contiene
     if (fileNode) {
       for (const node of nodes) {
         if (node.type !== 'file') {
@@ -190,14 +197,12 @@ export class GraphLearner {
       }
     }
 
-    // Detectar imports y crear edges
     const importLines = content.match(/import\s+.*?from\s+['"](.+?)['"]/g);
     if (importLines) {
       for (const imp of importLines) {
         const fromMatch = imp.match(/from\s+['"](.+?)['"]/);
         if (fromMatch) {
-          const importedFile = fromMatch[1];
-          edges.push({ source: fileId, target: `file_${importedFile}`, relation: 'imports' });
+          edges.push({ source: fileId, target: `file_${fromMatch[1]}`, relation: 'imports' });
         }
       }
     }
@@ -205,7 +210,24 @@ export class GraphLearner {
     return edges;
   }
 
-  // ---- NOTAS DEL VAULT ----
+  private buildEdgeNotes(edges: GraphEdge[]): string {
+    if (edges.length === 0) return '';
+    const links: string[] = [];
+    for (const e of edges) {
+      const sourceSlug = this.slugify(e.source);
+      const targetSlug = this.slugify(e.target);
+      links.push(`- [[${sourceSlug}]] → [[${targetSlug}]] (${e.relation})`);
+    }
+    return [
+      '---',
+      'tipo: edges',
+      `total: ${edges.length}`,
+      '---',
+      '',
+      '# Relaciones',
+      ...links,
+    ].join('\n');
+  }
 
   private buildNodeNote(node: GraphNode): string {
     return [

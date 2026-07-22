@@ -46,7 +46,10 @@ REGLAS:
           },
         },
       },
-      async (args) => webSearch(args.query as string),
+      async (args) => {
+        try { return await webSearch(args.query as string); }
+        catch (e: unknown) { return 'Error: ' + (e instanceof Error ? e.message : String(e)); }
+      },
     );
 
     this.addTool(
@@ -64,7 +67,10 @@ REGLAS:
           },
         },
       },
-      async (args) => fetchURL(args.url as string),
+      async (args) => {
+        try { return await fetchURL(args.url as string); }
+        catch (e: unknown) { return 'Error: ' + (e instanceof Error ? e.message : String(e)); }
+      },
     );
   }
 }

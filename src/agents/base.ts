@@ -52,21 +52,32 @@ export abstract class BaseAgent {
 
     while (turn < maxTurns) {
       turn++;
-      const response = await chatCompletion(
-        {
-          model: this.config.model || 'deepseek-chat',
-          messages: this.history,
-          tools: this.config.tools,
-          tool_choice: 'auto',
-          temperature: this.config.temperature ?? 0.7,
-          max_tokens: this.config.maxTokens ?? 8192,
-        },
-        (chunk) => {
-          if (chunk.content) {
-            this.emit({ type: 'thought', agent: this.config.name, message: chunk.content });
-          }
-        },
-      );
+      let response;
+      try {
+        response = await chatCompletion(
+          {
+            model: this.config.model || 'deepseek-chat',
+            messages: this.history,
+            tools: this.config.tools,
+            tool_choice: 'auto',
+            temperature: this.config.temperature ?? 0.7,
+            max_tokens: this.config.maxTokens ?? 8192,
+          },
+          (chunk) => {
+            if (chunk.content) {
+              this.emit({ type: 'thought', agent: this.config.name, message: chunk.content });
+            }
+          },
+        );
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.emit({ type: 'error', agent: this.config.name, message: `Error en chatCompletion: ${msg}` });
+        return {
+          content: `Error: ${msg}`,
+          toolCalls: [],
+          model: this.config.model || 'unknown',
+        };
+      }
 
       if (response.tool_calls && response.tool_calls.length > 0) {
         this.history.push({
@@ -80,7 +91,7 @@ export abstract class BaseAgent {
           this.emit({ type: 'action', agent: this.config.name, message: `${fnName}`, data: tc.function.arguments });
 
           let args: Record<string, unknown> = {};
-          try { args = JSON.parse(tc.function.arguments); } catch {}
+          try { args = JSON.parse(tc.function.arguments); } catch { /* keep empty args */ }
 
           let result: string;
           const handler = this.toolMap.get(fnName);

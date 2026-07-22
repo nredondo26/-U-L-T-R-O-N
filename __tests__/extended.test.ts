@@ -200,13 +200,13 @@ describe('Edge cases', () => {
 
 describe('Provider edge cases', () => {
   it('getProvider returns null when no keys set', () => {
-    const { getProvider } = require('../src/llm/providers');
-    // Save and clear keys
+    const { getProvider, resetProviders } = require('../src/llm/providers');
     const saved: Record<string, string | undefined> = {};
     for (const k of ['DASHSCOPE_API_KEY', 'DEEPSEEK_API_KEY', 'NVIDIA_API_KEY', 'OPENROUTER_API_KEY']) {
       saved[k] = process.env[k];
       delete process.env[k];
     }
+    resetProviders();
     try {
       const result = getProvider('nonexistent-model');
       expect(result).toBeNull();
@@ -214,16 +214,18 @@ describe('Provider edge cases', () => {
       for (const [k, v] of Object.entries(saved)) {
         if (v) process.env[k] = v;
       }
+      resetProviders();
     }
   });
 
   it('getAllModels returns empty with no keys', () => {
-    const { getAllModels } = require('../src/llm/providers');
+    const { getAllModels, resetProviders } = require('../src/llm/providers');
     const saved: Record<string, string | undefined> = {};
     for (const k of ['DASHSCOPE_API_KEY', 'DEEPSEEK_API_KEY', 'NVIDIA_API_KEY', 'OPENROUTER_API_KEY']) {
       saved[k] = process.env[k];
       delete process.env[k];
     }
+    resetProviders();
     try {
       const result = getAllModels();
       expect(result).toEqual([]);
@@ -231,6 +233,7 @@ describe('Provider edge cases', () => {
       for (const [k, v] of Object.entries(saved)) {
         if (v) process.env[k] = v;
       }
+      resetProviders();
     }
   });
 

@@ -102,7 +102,7 @@ async function executeToolOnce(
       return architect.formatPlan(plan);
     }
     case 'vault_save':
-      return `Nota "${args.name}" lista para guardar.`;
+      return `Nota "${args.name}" lista para guardar. (guardada por el orchestrator)`;
     case 'direct_execute': {
       const result = await executeCommand(args.command as string, projectDir);
       return `STDOUT:\n${result.stdout || '(vacio)'}\nSTDERR:\n${result.stderr || '(ninguno)'}\nEXIT: ${result.code}`;
@@ -133,8 +133,8 @@ async function executeToolOnce(
     case 'str_replace': {
       try {
         const filePath = args.filePath as string;
-        const oldStr = args.old_str as string;
-        const newStr = args.new_str as string;
+        const oldStr = (args.oldStr as string) || (args.old_str as string) || '';
+        const newStr = (args.newStr as string) || (args.new_str as string) || '';
         const content = fileTools.readFile(filePath, projectDir);
 
         // Exact match
@@ -262,7 +262,7 @@ export async function executeToolsParallel(
   const results = await Promise.all(
     toolCalls.map(async (tc) => {
       let args: Record<string, unknown> = {};
-      try { args = JSON.parse(tc.function.arguments); } catch {}
+      try { args = JSON.parse(tc.function.arguments); } catch { /* keep empty args */ }
       const { result, retries } = await executor(tc.function.name, args);
       return { tool_call_id: tc.id, content: result, retries };
     }),

@@ -26,7 +26,7 @@ function rotateLogs(): void {
         fs.unlinkSync(fp);
       }
     }
-  } catch {}
+  } catch { /* log rotation skipped */ }
 }
 
 const logFile = path.join(logDir, `jarvis-${new Date().toISOString().slice(0, 10)}.log`);
@@ -62,7 +62,7 @@ function writeLog(level: LogLevel, msg: string, data?: Record<string, unknown>):
   // File output
   try {
     fs.appendFileSync(logFile, line + '\n');
-  } catch {}
+  } catch { /* log file append failed */ }
 }
 
 export function getLogDir(): string { return logDir; }

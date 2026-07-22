@@ -48,7 +48,9 @@ export class ConfigStore {
         const raw = fs.readFileSync(this.filePath, 'utf8');
         return { ...this.defaults(), ...JSON.parse(raw) };
       }
-    } catch {}
+    } catch (e: unknown) {
+      console.error('[config] Failed to load config:', e instanceof Error ? e.message : String(e));
+    }
     return this.defaults();
   }
 
@@ -56,7 +58,9 @@ export class ConfigStore {
     try {
       this.data.lastSession = new Date().toISOString();
       fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
-    } catch {}
+    } catch (e: unknown) {
+      console.error('[config] Failed to save config:', e instanceof Error ? e.message : String(e));
+    }
   }
 
   // Model

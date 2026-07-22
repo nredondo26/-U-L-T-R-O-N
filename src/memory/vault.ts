@@ -74,7 +74,7 @@ export class ObsidianVault {
             });
           }
         }
-      } catch {}
+      } catch { /* skip unreadable directory */ }
     };
     scan(this.vaultDir, '');
     return notes;
@@ -101,7 +101,12 @@ export class ObsidianVault {
   writeNote(name: string, content: string): VaultNote {
     const safeName = sanitizeFilename(name);
     const filePath = path.join(this.vaultDir, safeName + '.md');
-    fs.writeFileSync(filePath, content, 'utf8');
+    try {
+      ensureDir(this.vaultDir);
+      fs.writeFileSync(filePath, content, 'utf8');
+    } catch (e: unknown) {
+      log.warn('vault writeNote failed', { name: safeName, error: e instanceof Error ? e.message : String(e) });
+    }
     return { name: safeName, path: safeName + '.md', size: content.length, links: [], tags: [], excerpt: content.slice(0, 150) };
   }
 

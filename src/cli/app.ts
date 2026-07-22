@@ -265,7 +265,7 @@ async function validateKeys(providers: LLMProvider[]): Promise<Array<{ provider:
       if (res.ok) results.push({ provider: p.name, ok: true });
       else {
         let err = `HTTP ${res.status}`;
-        try { const body: any = await res.json(); if (body?.error?.message) err = body.error.message; } catch {}
+        try { const body: any = await res.json(); if (body?.error?.message) err = body.error.message; } catch { /* keep status text */ }
         results.push({ provider: p.name, ok: false, error: err });
       }
     } catch (e: unknown) {

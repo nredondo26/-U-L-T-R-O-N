@@ -37,7 +37,7 @@ export async function speak(text: string, voice?: string, options?: SpeakOptions
         signal: AbortSignal.timeout(5000),
       });
       if (r.ok) return `Hablando (Voicebox): "${safe.slice(0, 80)}..."`;
-    } catch {}
+    } catch { /* voice command failed — non-critical */ }
   }
 
   return speakNative(safe, selectedVoice, options);
@@ -101,7 +101,7 @@ export async function listVoices(): Promise<string[]> {
       const r = await fetch(`${VOICEBOX_URL}/profiles`, { signal: AbortSignal.timeout(3000) });
       const data = await r.json() as Array<{ id: string; name: string }>;
       return data.map(v => v.name || v.id);
-    } catch {}
+    } catch { /* voice command failed — non-critical */ }
   }
 
   // List Windows voices

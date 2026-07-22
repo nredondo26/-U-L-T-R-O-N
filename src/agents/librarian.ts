@@ -1,31 +1,15 @@
 // src/agents/librarian.ts
-// Agente Librarian: entiende el codebase usando code-graph-memory
+// Agente Librarian: entiende el codebase
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { BaseAgent } from './base';
 import type { AgentConfig } from './types';
 import * as fileTools from '../tools/file';
-
-interface GraphNode {
-  id: string;
-  type: string;
-  name: string;
-  filePath: string;
-  line: number;
-  summary: string;
-}
-
-interface GraphEdge {
-  source: string;
-  target: string;
-  type: string;
-}
+import { log } from '../shared/logger';
 
 export class LibrarianAgent extends BaseAgent {
   private projectDir: string;
-  private graphMemoryPath: string;
-  private graphReady = false;
 
   constructor(projectDir: string) {
     const config: AgentConfig = {
@@ -54,7 +38,6 @@ REGLAS:
     };
     super(config);
     this.projectDir = projectDir;
-    this.graphMemoryPath = path.join(projectDir, '..', 'code-graph-memory');
   }
 
   protected registerTools(): void {
@@ -74,19 +57,24 @@ REGLAS:
         },
       },
       async (args) => {
-        const files = fileTools.listFiles(
-          (args.directory as string) || '.',
-          this.projectDir,
-          5,
-        );
-        let filtered = files;
-        if (args.pattern) {
-          const raw = (args.pattern as string).slice(0, 100);
-          const sanitized = raw.replace(/[.+*?^$()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
-          const regex = new RegExp(sanitized, 'i');
-          filtered = files.filter(f => regex.test(f));
+        try {
+          const files = fileTools.listFiles(
+            (args.directory as string) || '.',
+            this.projectDir,
+            5,
+          );
+          let filtered = files;
+          if (args.pattern) {
+            const raw = (args.pattern as string).slice(0, 100);
+            const sanitized = raw.replace(/[.+*?^$()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+            const regex = new RegExp(sanitized, 'i');
+            filtered = files.filter(f => regex.test(f));
+          }
+          return filtered.join('\n') || '(vacio)';
+        } catch (e: unknown) {
+          log.error('librarian: list_files error', { error: e instanceof Error ? e.message : String(e) });
+          return 'Error: ' + (e instanceof Error ? e.message : String(e));
         }
-        return filtered.join('\n') || '(vacio)';
       },
     );
 
@@ -118,7 +106,7 @@ REGLAS:
             );
           }
           const content = fileTools.readFile(args.filePath as string, this.projectDir);
-          return content.slice(0, 8000); // limit for context
+          return content.slice(0, 8000);
         } catch (e: unknown) {
           return 'Error: ' + (e instanceof Error ? e.message : String(e));
         }
@@ -142,13 +130,18 @@ REGLAS:
         },
       },
       async (args) => {
-        const results = fileTools.searchInFiles(
-          args.query as string,
-          this.projectDir,
-          args.filePattern as string | undefined,
-        );
-        if (results.length === 0) return 'No encontrado.';
-        return results.map(r => `${r.file}:${r.line}: ${r.content}`).join('\n');
+        try {
+          const results = fileTools.searchInFiles(
+            args.query as string,
+            this.projectDir,
+            args.filePattern as string | undefined,
+          );
+          if (results.length === 0) return 'No encontrado.';
+          return results.map(r => `${r.file}:${r.line}: ${r.content}`).join('\n');
+        } catch (e: unknown) {
+          log.error('librarian: grep error', { error: e instanceof Error ? e.message : String(e) });
+          return 'Error: ' + (e instanceof Error ? e.message : String(e));
+        }
       },
     );
 
@@ -196,7 +189,9 @@ REGLAS:
           result += this.buildTree(path.join(dir, item.name), maxDepth, depth + 1, newPrefix);
         }
       }
-    } catch {}
+    } catch (e: unknown) {
+      log.error('librarian: buildTree error', { error: e instanceof Error ? e.message : String(e), dir });
+    }
     return result;
   }
 }

@@ -29,18 +29,20 @@
 | 🧠 **Persistent Memory (Vault)** | Obsidian-style markdown vault with `[[links]]` and `#tags` — cross-session memory that grows over time |
 | 🔌 **Smart Router** | Free-first model selection with circuit breaker, cost tracking, and automatic fallback between providers |
 | 🤝 **Fusion Strategy** | Query multiple models simultaneously and pick the best response with tool_calls priority |
-| 🔄 **Auto Model Validation** | Validates all models on startup via SSE progress bar, graceful degradation |
-| 🛑 **Stop Button + Queue** | Cancel running requests and queue messages for sequential processing |
+| 🔄 **Auto Model Validation** | Validates all models on startup via SSE progress bar, graceful degradation — synced with circuit breaker |
+| 🛑 **Stop Button + Queue** | Cancel running requests via `/api/stop` and queue messages for sequential processing |
 | 🖥️ **Full System Automation** | Mouse control, keyboard simulation, screen capture, app launching — via PowerShell |
-| 🌐 **Web Search & Research** | Built-in web search capability for real-time information gathering |
+| 🌐 **Web Search & Research** | Built-in web search with timeouts and fetch with abort signals |
 | 📁 **File System Mastery** | Read, write, edit, grep, search — full codebase manipulation |
 | 🎯 **Smart Click & Type** | Intelligent UI automation with multi-strategy fallback |
-| 📊 **Model Health Monitoring** | Automatic health checks across all models with circuit breaker pattern |
-| 🔄 **Auto-Summarization** | Automatic conversation summarization every 12 turns to maintain context |
+| 📊 **Model Health Monitoring** | Health checks synced with circuit breaker — unhealthy models pre-blocked |
+| 🔄 **Auto-Summarization** | Automatic conversation summarization every 12 turns using current model |
 | 🌍 **Bilingual** | Full Spanish/English support with natural conversational tone |
 | 🚀 **Compiled Executable** | Single `.exe` binary via Bun's compiler — no runtime dependencies |
 | 🐳 **Docker Support** | Containerized deployment with Dockerfile and multi-stage build |
 | 📈 **Token Tracking** | Real-time token usage statistics across all requests |
+| 🔒 **API Key Auth** | Optional Bearer token authentication for web dashboard + reverse proxy support |
+| ⚡ **Parallel Model Testing** | Batch model testing in parallel (5 concurrent) with progress callbacks |
 
 ---
 
@@ -179,6 +181,21 @@ bun test
 bun run typecheck
 ```
 
+### CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `-p, --project <dir>` | Project directory (default: current) |
+| `-v, --vault <dir>` | Vault directory (default: ./vault) |
+| `-e, --env <file>` | .env file path |
+| `--web` | Web UI only |
+| `--cli` | CLI only |
+| `--port <n>` | Web UI port (default: 3456) |
+| `--bind <addr>` | Listen address (default: 127.0.0.1, use 0.0.0.0 for network) |
+| `--trust-proxy` | Trust X-Forwarded-For headers (for reverse proxy) |
+| `--api-key <key>` | API key for web auth (or set ULTRON_API_KEY in .env) |
+| `-h, --help` | Show help |
+
 ### Commands
 
 | Command | Description |
@@ -249,6 +266,15 @@ ULTRON includes a full-featured web dashboard:
 ```bash
 bun run web
 # Opens at http://127.0.0.1:3456
+
+# With authentication
+bun run web -- --api-key "your-secret-key"
+
+# Expose on network (for reverse proxy)
+bun run web -- --bind 0.0.0.0 --api-key "your-secret-key" --trust-proxy
+
+# Custom port
+bun run web -- --port 8080
 ```
 
 ### Dashboard Features
@@ -256,7 +282,7 @@ bun run web
 - **Real-time chat** with SSE streaming
 - **Agent activity panel** — see which agent is working in real-time
 - **Model selector** — switch between all available models
-- **Stop button** — cancel running requests immediately
+- **Stop button** — cancel running requests immediately via `/api/stop`
 - **Queue system** — messages queue when one is already processing
 - **Auto model validation** — progress bar on startup validates all models
 - **Token counter** — live token usage display
@@ -267,17 +293,24 @@ bun run web
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/chat` | POST | Send message (SSE streaming response) |
+| `/api/stop` | POST | Cancel current request immediately |
+| `/api/auth` | POST | Validate API key (returns token) |
 | `/api/models` | GET | List all models with health status |
 | `/api/models` | POST | Set active model |
 | `/api/status` | GET | Current model and token stats |
+| `/api/agents` | GET | Agent activity states |
 | `/api/health` | GET | Server health and model health summary |
 | `/api/router` | GET | Smart Router state (circuit breaker, costs) |
 | `/ws` | GET | SSE endpoint for real-time events |
 
 ### Security
 
-- Rate limiting per endpoint (10 req/min for chat, 30 for models/status)
+- **API Key Authentication**: Optional via `--api-key` flag or `ULTRON_API_KEY` env var
+- **Reverse Proxy Ready**: `--trust-proxy` flag respects `X-Forwarded-For` headers
+- **Configurable Bind**: `--bind` flag allows binding to `0.0.0.0` for network access
+- Rate limiting per endpoint (30 req/min for chat, 60 for models/status)
 - CSP, HSTS, CORS headers on all responses
+- Body size limit (1MB) prevents OOM attacks
 - Sandbox mode for command execution safety
 
 ---

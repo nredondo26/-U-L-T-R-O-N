@@ -8,8 +8,14 @@
 <link rel="apple-touch-icon" href="/favicon.ico">
 <style>
 :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2a;--hover:#1a1a28;--accent:#22d3ee;--accent-dim:rgba(34,211,238,0.15);--text:#e2e8f0;--dim:#6b7280;--success:#4ade80;--warn:#fbbf24;--error:#f87171;--font:system-ui,-apple-system,sans-serif}
-
-/* Validation banner (non-blocking, top bar style) */
+#authOverlay{display:none;position:fixed;inset:0;z-index:9999;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#authOverlay.show{display:flex}
+#authOverlay h2{font-size:24px;color:var(--accent);font-weight:700;letter-spacing:2px}
+#authOverlay input{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:14px;width:280px;outline:none;text-align:center;font-family:var(--font)}
+#authOverlay input:focus{border-color:var(--accent)}
+#authOverlay button{background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font)}
+#authOverlay .auth-error{color:var(--error);font-size:12px;display:none}
+#authOverlay .auth-skip{font-size:11px;color:var(--dim);cursor:pointer;background:none;border:none;text-decoration:underline}
 #validateBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:var(--surface);border-bottom:1px solid var(--accent);padding:8px 16px;align-items:center;gap:12px}
 #validateBanner.show{display:flex}
 #validateBannerBar{flex:1;max-width:200px;height:3px;background:var(--border);border-radius:3px;overflow:hidden}
@@ -57,23 +63,43 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .queue-badge{display:none;align-self:center;font-size:10px;color:var(--warn);padding:2px 8px;background:rgba(251,191,36,0.12);border-radius:10px;white-space:nowrap}
 
 /* Agent sidebar */
-.sidebar{width:260px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
-.sidebar-title{padding:12px 16px;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.sidebar{width:300px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-title{padding:12px 16px;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.sidebar-title .badge{font-size:9px;background:var(--border);padding:1px 6px;border-radius:8px;color:var(--dim)}
 .agent-list{flex:1;overflow-y:auto;padding:4px}
 .agent-list::-webkit-scrollbar{width:3px}.agent-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.agent-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;margin:2px 0;transition:background .15s}
+.agent-item{border-radius:6px;margin:2px 0;transition:background .15s;cursor:pointer}
+.agent-item:hover{background:var(--hover)}
 .agent-item.active{background:var(--accent-dim)}
+.agent-item.done{background:rgba(74,222,128,0.08)}
+.agent-header{display:flex;align-items:center;gap:10px;padding:8px 12px}
 .agent-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
 .agent-info{flex:1;min-width:0}
 .agent-name{font-size:12px;font-weight:500;color:var(--text)}
-.agent-status{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-status-text{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s}
+.agent-status-text.active{color:var(--accent)}
+.agent-status-text.done{color:var(--success)}
+.agent-check{display:none;font-size:12px;color:var(--success);flex-shrink:0;animation:fadeIn .3s ease}
+.agent-check.show{display:inline}
 .agent-progress{width:100%;height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden}
 .agent-progress-bar{height:100%;border-radius:2px;transition:width .3s ease;width:0%}
+.agent-progress-bar.active{background:var(--accent);animation:pulse 1.2s ease-in-out infinite}
+.agent-progress-bar.done{background:var(--success);width:100%!important}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Agent action log (collapsible) */
+.agent-log{display:none;padding:0 12px 8px 50px;font-size:10px;color:var(--dim);max-height:120px;overflow-y:auto}
+.agent-log.open{display:block}
+.agent-log::-webkit-scrollbar{width:2px}.agent-log::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.agent-log-entry{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:6px}
+.agent-log-time{color:var(--dim);flex-shrink:0;font-family:monospace;font-size:9px}
+.agent-log-text{color:var(--text);opacity:.7}
 
 @media(max-width:768px){.sidebar{display:none}.msg{max-width:100%}.header-stats{display:none}}
 </style>
 </head>
 <body>
+<div id="authOverlay"><h2>ULTRON</h2><input id="authInput" type="password" placeholder="API Key"><button id="authSubmit">Desbloquear</button><div class="auth-error" id="authError"></div><button class="auth-skip" id="authSkip">Usar sin autenticacion</button></div>
 <div id="validateBanner">
   <div id="validateBannerLabel">Validando modelos...</div>
   <div id="validateBannerBar"><div id="validateBannerFill"></div></div>
@@ -102,12 +128,41 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
     </div>
   </div>
   <div class="sidebar" id="sidebar">
-    <div class="sidebar-title">Agents</div>
+    <div class="sidebar-title">Agentes <span class="badge" id="activeCount">0 activos</span></div>
     <div class="agent-list" id="agentList"></div>
   </div>
 </div>
 
 <script>
+let authToken='';
+function apiFetch(url,opts={}){
+  const headers={...opts.headers||{}};
+  if(authToken)headers['Authorization']='Bearer '+authToken;
+  return fetch(url,{...opts,headers});
+}
+(async function initAuth(){
+  try{
+    const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'_check_'})});
+    const d=await r.json();
+    if(d.ok&&d.message)return;
+    const saved=localStorage.getItem('ultron_api_key');
+    if(saved){
+      const vr=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:saved})});
+      const vd=await vr.json();
+      if(vd.ok){authToken=saved;return}
+    }
+    document.getElementById('authOverlay').classList.add('show');
+    document.getElementById('authSubmit').onclick=async()=>{
+      const key=document.getElementById('authInput').value.trim();if(!key)return;
+      const ar=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+      const ad=await ar.json();
+      if(ad.ok){authToken=key;localStorage.setItem('ultron_api_key',key);document.getElementById('authOverlay').classList.remove('show')}
+      else{const err=document.getElementById('authError');err.style.display='block';err.textContent='Invalid key';}
+    };
+    document.getElementById('authInput').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('authSubmit').click()});
+  }catch(e){}
+})();
+
 document.getElementById('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 
 const agents = [
@@ -123,26 +178,120 @@ const agents = [
 
 let tokens=0,model='',isStreaming=false,streamMsg=null,currentController=null;
 const pendingQueue=[];
+const agentLogs = {}; // agentId -> [{time,text}]
+const agentDoneTimers = {}; // agentId -> timeout
 
 function renderAgentList(){
   const list=document.getElementById('agentList');list.innerHTML='';
   for(const a of agents){
     const el=document.createElement('div');el.className='agent-item';el.id='agent-'+a.id;
-    el.innerHTML=`
-      <div class="agent-icon" style="background:${a.color}20;color:${a.color}">${a.icon}</div>
-      <div class="agent-info">
-        <div class="agent-name">${a.displayName || a.id}</div>
-        <div class="agent-status" id="status-${a.id}">idle</div>
-        <div class="agent-progress"><div class="agent-progress-bar" id="progress-${a.id}" style="background:${a.color}"></div></div>
-      </div>`;
+    el.innerHTML='<div class="agent-header">'+
+      '<div class="agent-icon" style="background:'+a.color+'20;color:'+a.color+'">'+a.icon+'</div>'+
+      '<div class="agent-info">'+
+        '<div class="agent-name">'+(a.displayName||a.id)+'</div>'+
+        '<div class="agent-status-text" id="stxt-'+a.id+'">idle</div>'+
+        '<div class="agent-progress"><div class="agent-progress-bar" id="prog-'+a.id+'" style="background:'+a.color+'"></div></div>'+
+      '</div>'+
+      '<span class="agent-check" id="chk-'+a.id+'">✓</span>'+
+    '</div>'+
+    '<div class="agent-log" id="log-'+a.id+'"></div>';
+    el.addEventListener('click',()=>toggleAgentLog(a.id));
     list.appendChild(el);
+    agentLogs[a.id]=[];
   }
 }
 renderAgentList();
 
+function toggleAgentLog(id){
+  const log=document.getElementById('log-'+id);
+  log.classList.toggle('open');
+  if(log.classList.contains('open'))renderAgentLog(id);
+}
+
+function renderAgentLog(id){
+  const log=document.getElementById('log-'+id);
+  if(!log.classList.contains('open'))return;
+  const entries=agentLogs[id]||[];
+  if(entries.length===0){log.innerHTML='<div class="agent-log-entry"><span class="agent-log-text">(sin actividad reciente)</span></div>';return}
+  log.innerHTML=entries.map(e=>'<div class="agent-log-entry"><span class="agent-log-time">'+e.time+'</span><span class="agent-log-text">'+esc(e.text)+'</span></div>').join('');
+  log.scrollTop=log.scrollHeight;
+}
+
+function setAgentStatus(id,status,msg){
+  const a=agents.find(x=>x.id===id);if(!a)return;
+  const item=document.getElementById('agent-'+id);
+  const stxt=document.getElementById('stxt-'+id);
+  const prog=document.getElementById('prog-'+id);
+  const chk=document.getElementById('chk-'+id);
+  if(!item||!stxt||!prog||!chk)return;
+
+  // Clear any pending done timer
+  if(agentDoneTimers[id]){clearTimeout(agentDoneTimers[id]);delete agentDoneTimers[id]}
+
+  if(status==='active'||status==='action'){
+    item.className='agent-item active';
+    stxt.className='agent-status-text active';
+    stxt.textContent=msg||'trabajando...';
+    prog.className='agent-progress-bar active';
+    chk.classList.remove('show');
+    // Add to log
+    if(msg){agentLogs[id].push({time:new Date().toLocaleTimeString(),text:msg});if(agentLogs[id].length>50)agentLogs[id].splice(0,agentLogs[id].length-50)}
+    renderAgentLog(id);
+  } else if(status==='thought'){
+    item.className='agent-item active';
+    stxt.className='agent-status-text active';
+    stxt.textContent=msg||'pensando...';
+    prog.className='agent-progress-bar active';
+    chk.classList.remove('show');
+  } else if(status==='done'||status==='result'){
+    item.className='agent-item done';
+    stxt.className='agent-status-text done';
+    stxt.textContent=msg||'✓ completado';
+    prog.className='agent-progress-bar done';
+    chk.classList.add('show');
+    // Free after 4s
+    agentDoneTimers[id]=setTimeout(()=>{
+      item.className='agent-item';
+      stxt.className='agent-status-text';
+      stxt.textContent='idle';
+      prog.className='agent-progress-bar';
+      prog.style.width='0%';
+      chk.classList.remove('show');
+      delete agentDoneTimers[id];
+      updateActiveCount();
+    },4000);
+  } else {
+    // idle / error
+    item.className=status==='error'?'agent-item done':'agent-item';
+    stxt.className='agent-status-text';
+    stxt.textContent=status==='error'?('✗ '+ (msg||'error')):'idle';
+    prog.className='agent-progress-bar';
+    chk.classList.remove('show');
+  }
+  updateActiveCount();
+}
+
+function updateActiveCount(){
+  const count=document.querySelectorAll('.agent-item.active').length;
+  document.getElementById('activeCount').textContent=count+' activo'+(count!==1?'s':'');
+}
+
+// Poll agent states from backend every 2s
+async function pollAgentStates(){
+  try{
+    const r=await apiFetch('/api/agents');const d=await r.json();
+    if(d.agents)for(const s of d.agents){
+      const known=agents.find(a=>a.id===s.id);
+      if(known)setAgentStatus(s.id,s.status,s.message);
+    }
+  }catch(e){}
+}
+setInterval(pollAgentStates,2000);
+
 async function loadModels(){
   try{
-    const r=await fetch('/api/models');const d=await r.json();
+    const r=await apiFetch('/api/models');const d=await r.json();
+    if(!d.models){setTimeout(loadModels,2000);return}
     const sel=document.getElementById('modelSelect');sel.innerHTML='';
     const providers={};
     for(const m of d.models){
@@ -166,13 +315,13 @@ async function loadModels(){
 
 async function switchModel(modelId){
   if(!modelId)return;
-  try{const r=await fetch('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:modelId})});const d=await r.json();model=d.current;updateStats()}catch(e){console.error(e)}
+  try{const r=await apiFetch('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:modelId})});const d=await r.json();model=d.current;updateStats()}catch(e){console.error(e)}
 }
 
 document.getElementById('modelSelect').addEventListener('change',e=>switchModel(e.target.value));
 loadModels();
 
-// SSE for validation progress
+// SSE for streaming + events
 const es=new EventSource('/ws');
 es.addEventListener('validate',e=>{
   try{
@@ -199,6 +348,18 @@ es.addEventListener('validate',e=>{
   }catch(e){}
 });
 
+es.addEventListener('event',e=>{
+  try{
+    const d=JSON.parse(e.data);
+    if(d.type==='action')setAgentStatus(d.agent,'action',d.message||d.data?.task||'')
+    else if(d.type==='done')setAgentStatus(d.agent,'done',(d.displayName||d.agent)+' completado')
+    else if(d.type==='thought')setAgentStatus(d.agent,'thought',d.message||'')
+  }catch(e){}
+});
+
+// Intercept chat stream events too (the old path)
+let sseLastEvent='';
+
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function safeMD(t){return esc(t).replace(/```(\w+)?\n([\s\S]*?)```/g,'<pre>$2</pre>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>')}
 
@@ -206,17 +367,6 @@ function addMessage(text,type){
   const el=document.createElement('div');el.className='msg '+type;
   el.innerHTML=safeMD(text);
   document.getElementById('messages').appendChild(el);el.scrollIntoView(false);return el
-}
-
-function setAgentStatus(id,status,log){
-  const a=agents.find(x=>x.id===id);if(!a)return;
-  const item=document.getElementById('agent-'+id);
-  const statusEl=document.getElementById('status-'+id);
-  const progressEl=document.getElementById('progress-'+id);
-  if(!item||!statusEl||!progressEl)return;
-  item.className='agent-item'+(status==='active'?' active':'');
-  statusEl.textContent=log||status;
-  if(status==='active'){progressEl.style.width='60%'}else if(status==='done'){progressEl.style.width='100%';setTimeout(()=>{progressEl.style.width='0%';statusEl.textContent='idle'},2000)}else{progressEl.style.width='0%'}
 }
 
 let streamRawText='';
@@ -248,7 +398,7 @@ async function doSend(text){
   const controller=new AbortController();currentController=controller;streamRawText='';
   const tm=setTimeout(()=>controller.abort(),180000);
   try{
-    const resp=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,model:model}),signal:controller.signal});clearTimeout(tm);
+    const resp=await apiFetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,model:model}),signal:controller.signal});clearTimeout(tm);
     if(!resp.ok){showTyping(false);addMessage('Error: HTTP '+resp.status,'ai');finishSend();return}
     if(controller.signal.aborted){finishSend();return}
     const reader=resp.body.getReader();const decoder=new TextDecoder();
@@ -271,15 +421,16 @@ async function doSend(text){
             }
             else if(d.type==='event'&&d.data){
               const ev=d.data;
-              if(ev.type==='action'){setAgentStatus(ev.agent,'active',ev.message.slice(0,40))}
-              else if(ev.type==='done'){setAgentStatus(ev.agent,'done','completed')}
-              else if(ev.type==='thought'){setAgentStatus(ev.agent,'active','thinking...')}
+              if(ev.type==='action')setAgentStatus(ev.agent,'action',ev.message||ev.data?.task||'')
+              else if(ev.type==='done')setAgentStatus(ev.agent,'done',(ev.displayName||ev.agent)+' completado')
+              else if(ev.type==='thought')setAgentStatus(ev.agent,'thought',ev.message||'')
             }
             else if(d.type==='result'){
               if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);
               tokens=d.tokens?.tokens||0;updateStats();streamMsg=null;streamRawText='';
             }
             else if(d.type==='error'){showTyping(false);addMessage('Error: '+d.error,'ai')}
+            else if(d.type==='done'){setAgentStatus('Orchestrator','done','Cerebro completado')}
           }catch(e){}
         }
       }

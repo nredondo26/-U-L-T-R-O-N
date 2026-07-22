@@ -14,48 +14,64 @@ export async function testAllModels(
 ): Promise<string> {
   const providers = getProviders();
   const allModels = getAllModels();
-  const results: TestResult[] = [];
 
   let tested = 0;
   const total = allModels.length;
+  const BATCH = 5;
 
-  for (const p of providers) {
-    const providerModels = allModels.filter(m => m.provider === p.name);
-    if (providerModels.length === 0) continue;
+  const allResults: TestResult[] = [];
 
-    for (const m of providerModels) {
-      tested++;
+  // Group all models by provider
+  const providerMap = new Map<string, Array<{ model: string; provider: string; baseURL: string; apiKey: string }>>();
+  for (const m of allModels) {
+    const p = providers.find(pr => pr.name === m.provider);
+    if (!p) continue;
+    const arr = providerMap.get(p.name) || [];
+    arr.push({ model: m.model, provider: p.name, baseURL: p.baseURL, apiKey: p.apiKey });
+    providerMap.set(p.name, arr);
+  }
+
+  const flatModels: Array<{ model: string; provider: string; baseURL: string; apiKey: string }> = [];
+  for (const arr of providerMap.values()) flatModels.push(...arr);
+
+  for (let i = 0; i < flatModels.length; i += BATCH) {
+    const batch = flatModels.slice(i, i + BATCH);
+    const batchResults = await Promise.allSettled(batch.map(async (m) => {
       const start = Date.now();
-      try {
-        const res = await fetch(`${p.baseURL}/chat/completions`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${p.apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: m.model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1, temperature: 0 }),
-          signal: AbortSignal.timeout(15000),
-        });
-        const ms = Date.now() - start;
-        if (res.ok) {
-          const r: TestResult = { model: m.model, provider: p.name, ok: true, ms };
-          results.push(r);
-          onProgress?.(r);
-        } else {
-          let err = `HTTP ${res.status}`;
-          try { const b = await res.json() as Record<string, unknown>; const e = b?.error as { message?: string } | undefined; if (e?.message) err = e.message; } catch {}
-          const r: TestResult = { model: m.model, provider: p.name, ok: false, ms, error: err };
-          results.push(r);
-          onProgress?.(r);
-        }
-      } catch (e: unknown) {
-        const ms = Date.now() - start;
-        const r: TestResult = { model: m.model, provider: p.name, ok: false, ms, error: e instanceof Error ? e.message.slice(0, 60) : String(e).slice(0, 60) };
-        results.push(r);
-        onProgress?.(r);
+      const res = await fetch(`${m.baseURL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${m.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: m.model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1, temperature: 0 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const ms = Date.now() - start;
+      if (res.ok) {
+        const r: TestResult = { model: m.model, provider: m.provider, ok: true, ms };
+        return r;
+      } else {
+        let err = `HTTP ${res.status}`;
+        try { const b = await res.json() as Record<string, unknown>; const e = b?.error as { message?: string } | undefined; if (e?.message) err = e.message; } catch { /* keep HTTP status error */ }
+        return { model: m.model, provider: m.provider, ok: false, ms, error: err } as TestResult;
+      }
+    }));
+
+    for (const r of batchResults) {
+      tested++;
+      if (r.status === 'fulfilled') {
+        allResults.push(r.value);
+        onProgress?.(r.value);
+      } else {
+        const failedModel = batch[tested - 1];
+        const errMsg = r.reason instanceof Error ? r.reason.message.slice(0, 60) : String(r.reason).slice(0, 60);
+        const tr: TestResult = { model: failedModel.model, provider: failedModel.provider, ok: false, ms: 0, error: errMsg };
+        allResults.push(tr);
+        onProgress?.(tr);
       }
     }
   }
 
-  const working = results.filter(r => r.ok);
-  const failed = results.filter(r => !r.ok);
+  const working = allResults.filter(r => r.ok);
+  const failed = allResults.filter(r => !r.ok);
 
   return `${working.length}/${total} modelos accesibles. Usa /model <id> para cambiar.`;
 }

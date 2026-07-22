@@ -3,6 +3,7 @@
 // Similar to Thinker but produces structured, executable plans
 
 import { BaseAgent } from './base';
+import { log } from '../shared/logger';
 import type { AgentConfig } from './types';
 
 interface ProjectPlan {
@@ -105,7 +106,8 @@ IMPORTANTE:
       const plan = JSON.parse(json) as ProjectPlan;
       this.lastPlan = plan;
       return plan;
-    } catch {
+    } catch (e: unknown) {
+      log.error('architect: plan parse failed, using fallback', { error: e instanceof Error ? e.message : String(e) });
       this.lastPlan = {
         name: 'Proyecto',
         description: requirements.slice(0, 100),

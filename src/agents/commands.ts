@@ -174,6 +174,13 @@ export async function handleCommand(
       const { getRecentLogs } = await import('../shared/logger');
       return { response: getRecentLogs(30) };
     }
+    case 'init': {
+      const knowledgePath = path.join(projectDir, 'knowledge.md');
+      if (!fs.existsSync(knowledgePath)) {
+        fs.writeFileSync(knowledgePath, `# ${path.basename(projectDir)} — Knowledge Base\n\n## Architecture\n\n## Key Files\n\n## Patterns\n\n## Dependencies\n\n## Notes\n`);
+      }
+      return { response: `Archivo creado: ${knowledgePath}` };
+    }
     case 'browse': {
       if (!args) return { response: 'Uso: /browse <url>' };
       return { response: `Abriendo ${args}...`, action: { type: 'browse', command: args, cwd: projectDir } };
@@ -214,7 +221,7 @@ function detectBuildCommand(dir: string): CommandResult {
       const scripts = pkg.scripts || {};
       if (scripts.build) return { response: 'Compilando (npm run build)...', action: { type: 'exec', command: 'npm run build', cwd: dir } };
       if (scripts.compile) return { response: 'Compilando (npm run compile)...', action: { type: 'exec', command: 'npm run compile', cwd: dir } };
-    } catch {}
+    } catch { /* JSON parse fallback */ }
     return { response: 'Ejecutando tsc...', action: { type: 'exec', command: 'npx tsc --noEmit', cwd: dir } };
   }
   if (fs.existsSync(path.join(dir, 'Cargo.toml'))) {
@@ -232,7 +239,7 @@ function detectTestCommand(dir: string): CommandResult {
       const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
       const scripts = pkg.scripts || {};
       if (scripts.test) return { response: 'Ejecutando tests (npm test)...', action: { type: 'exec', command: 'npm test', cwd: dir } };
-    } catch {}
+    } catch { /* JSON parse fallback */ }
   }
   if (fs.existsSync(path.join(dir, 'Cargo.toml'))) {
     return { response: 'Ejecutando tests Rust...', action: { type: 'exec', command: 'cargo test', cwd: dir } };
@@ -257,19 +264,25 @@ function helpText(): string {
   /build           - Compilar proyecto
   /test            - Ejecutar tests
   /index           - Indexar proyecto en grafo
+  /init            - Crear knowledge.md en el proyecto
   /browse <url>    - Abrir URL en navegador
   /open <app>      - Abrir app (code, notepad, explorer)
   /sandbox <mode>  - Modo sandbox (ask/allow/deny/allow-all)
   /allow <cmd>     - Agregar comando a allowlist
   /click /type /press - Automatizacion mouse/teclado
   /screenshot      - Capturar pantalla
+  /mouse           - Posicion del mouse
   /say <texto>     - Hablar por voz
   /voices          - Listar voces disponibles
   /voice-install   - Instalar voces en espanol
   /cd <dir>        - Cambiar directorio de trabajo
+  /commit [msg]    - Auto-commit en git
+  /push [msg]      - Auto-commit + push
+  /diff            - Git diff
+  /log [n]         - Git log (n commits)
+  /resume          - Restaurar sesion
   /logs            - Ver logs recientes
   /status          - Estado del sistema
-  /init            - Crear knowledge.md
   /exit            - Salir
 
 Atajos:

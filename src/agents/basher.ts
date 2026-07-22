@@ -52,8 +52,12 @@ REGLAS:
         },
       },
       async (args) => {
-        const result = await executeCommand(args.command as string, this.projectDir);
-        return `STDOUT:\n${result.stdout || '(vacio)'}\nSTDERR:\n${result.stderr || '(ninguno)'}\nEXIT: ${result.code}`;
+        try {
+          const result = await executeCommand(args.command as string, this.projectDir);
+          return `STDOUT:\n${result.stdout || '(vacio)'}\nSTDERR:\n${result.stderr || '(ninguno)'}\nEXIT: ${result.code}`;
+        } catch (e: unknown) {
+          return 'Error: ' + (e instanceof Error ? e.message : String(e));
+        }
       },
     );
 

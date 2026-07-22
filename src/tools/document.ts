@@ -45,7 +45,12 @@ export async function analyzeDocument(filePath: string): Promise<DocumentResult>
 }
 
 async function analyzePDF(filePath: string, fileName: string): Promise<DocumentResult> {
-  const pdfParse = require('pdf-parse');
+  let pdfParse: (buf: Buffer) => Promise<{ text: string; numpages: number }>;
+  try {
+    pdfParse = require('pdf-parse');
+  } catch {
+    return { success: false, content: '', fileType: 'pdf', fileName, charCount: 0, error: 'pdf-parse no instalado. Instala con: npm install pdf-parse' };
+  }
   const buffer = fs.readFileSync(filePath);
   // Disable test file check
   delete (buffer as any).__proto__;
@@ -61,7 +66,12 @@ async function analyzePDF(filePath: string, fileName: string): Promise<DocumentR
 }
 
 async function analyzeDocx(filePath: string, fileName: string): Promise<DocumentResult> {
-  const mammoth = require('mammoth');
+  let mammoth: { extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }> };
+  try {
+    mammoth = require('mammoth');
+  } catch {
+    return { success: false, content: '', fileType: 'docx', fileName, charCount: 0, error: 'mammoth no instalado. Instala con: npm install mammoth' };
+  }
   const buffer = fs.readFileSync(filePath);
   const result = await mammoth.extractRawText({ buffer });
   return {
@@ -74,7 +84,12 @@ async function analyzeDocx(filePath: string, fileName: string): Promise<Document
 }
 
 function analyzeExcel(filePath: string, fileName: string, ext: string): DocumentResult {
-  const XLSX = require('xlsx');
+  let XLSX: { readFile: (p: string) => { SheetNames: string[]; Sheets: Record<string, unknown> }; utils: { sheet_to_csv: (s: unknown) => string } };
+  try {
+    XLSX = require('xlsx');
+  } catch {
+    return { success: false, content: '', fileType: ext.slice(1), fileName, charCount: 0, error: 'xlsx no instalado. Instala con: npm install xlsx' };
+  }
   const workbook = XLSX.readFile(filePath);
   let allText = '';
   const sheetNames: string[] = workbook.SheetNames;

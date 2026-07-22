@@ -43,7 +43,7 @@ function loadHealth(): void {
     if (fs.existsSync(hf)) {
       healthData = JSON.parse(fs.readFileSync(hf, 'utf8'));
     }
-  } catch {}
+  } catch { /* health file not yet initialized or corrupt — starting fresh */ }
 }
 
 function saveHealth(): void {
@@ -52,7 +52,7 @@ function saveHealth(): void {
     const dir = path.dirname(hf);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(hf, JSON.stringify(healthData, null, 2), 'utf8');
-  } catch {}
+  } catch { /* health save failed — non-critical */ }
 }
 
 export function getModelHealth(modelId: string): ModelHealth {

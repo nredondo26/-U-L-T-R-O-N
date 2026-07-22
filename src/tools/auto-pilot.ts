@@ -138,7 +138,7 @@ export async function openAndFocus(app: string): Promise<string> {
   for (const strategy of strategies) {
     try {
       return await strategy();
-    } catch {}
+    } catch { /* strategy fallback exhausted */ }
   }
   return `No se pudo abrir: ${app}`;
 }

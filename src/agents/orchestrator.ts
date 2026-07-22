@@ -83,6 +83,45 @@ export class Orchestrator {
   private onEvent?: (event: AgentEvent) => void;
   private onStream?: (text: string) => void;
   private currentModel: string;
+  private agentStates: Map<string, { status: string; message: string; history: Array<{ time: string; text: string }>; lastActive: number }> = new Map();
+  private activeController: AbortController | null = null;
+
+  cancel(): void {
+    if (this.activeController) {
+      this.activeController.abort();
+      this.activeController = null;
+    }
+  }
+
+  private updateAgentState(agent: string, status: string, message: string): void {
+    const state = this.agentStates.get(agent) || { status: 'idle', message: '', history: [], lastActive: 0 };
+    state.status = status;
+    state.message = message;
+    state.lastActive = Date.now();
+    if (status === 'action' || status === 'thought') {
+      const text = message || (status === 'thought' ? 'pensando...' : '');
+      if (text) state.history.push({ time: new Date().toLocaleTimeString(), text });
+      if (state.history.length > 20) state.history = state.history.slice(-20);
+    }
+    this.agentStates.set(agent, state);
+  }
+
+  cleanupAgentStates(): void {
+    const now = Date.now();
+    for (const [agent, state] of this.agentStates) {
+      if ((state.status === 'done' || state.status === 'idle') && now - state.lastActive > 10000) {
+        state.message = '';
+      }
+    }
+  }
+
+  getAgentStates(): Array<{ id: string; status: string; message: string; history: Array<{ time: string; text: string }> }> {
+    const states: Array<{ id: string; status: string; message: string; history: Array<{ time: string; text: string }> }> = [];
+    for (const [id, state] of this.agentStates) {
+      states.push({ id, status: state.status, message: state.message, history: state.history });
+    }
+    return states;
+  }
 
   constructor(config: OrchestratorConfig) {
     this.config = config;
@@ -131,6 +170,7 @@ export class Orchestrator {
   }
   getStats() { return this.configStore.stats; }
   private emit(e: AgentEvent): void {
+    this.updateAgentState(e.agent, e.type, e.message);
     this.onEvent?.(e);
     for (const l of this.listeners.values()) l.onEvent(e);
   }
@@ -175,7 +215,7 @@ export class Orchestrator {
           }).then(summary => {
             this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: summary.slice(0, 120), data: { done: true } });
             this.emit({ type: 'done', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
-          }).catch(() => {});
+          }).catch((e: unknown) => { log.warn('model tester failed', { error: e instanceof Error ? e.message : String(e) }); });
           return 'Testeando modelos... Los resultados se mostrarán en el panel de Agentes.';
         }
         const out = await sandboxedExec(command, cwd);
@@ -183,6 +223,9 @@ export class Orchestrator {
       }
       return r.response;
     }
+
+    this.cancel();
+    this.activeController = new AbortController();
 
     this.emit({ type: 'thought', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
 
@@ -193,6 +236,7 @@ export class Orchestrator {
     let out = ''; let t = 0;
 
     while (t < this.config.maxSteps) {
+      if (this.activeController?.signal.aborted) { out = '[Cancelado]'; break; }
       t++;
       try {
         let streamBuf = '';
@@ -235,6 +279,7 @@ export class Orchestrator {
     if (this.configStore.turnCount > 0 && this.configStore.turnCount % SUMMARIZE_EVERY === 0) this.autoSummary();
 
     this.emit({ type: 'done', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
+    this.activeController = null;
     return out;
   }
 
@@ -246,7 +291,7 @@ export class Orchestrator {
     }
     let msg = input;
     for (const f of files) {
-      try { const content = fileTools.readFile(f, this.config.projectDir); msg += `\n[@${f}]:\n` + content.slice(0, 1500); } catch {}
+      try { const content = fileTools.readFile(f, this.config.projectDir); msg += `\n[@${f}]:\n` + content.slice(0, 1500); } catch (e: unknown) { log.warn('preprocess: readFile failed', { file: f, error: e instanceof Error ? e.message : String(e) }); }
     }
     return msg;
   }
@@ -258,6 +303,7 @@ export class Orchestrator {
     const { result, retries } = await executeTool(name, args, this.config.projectDir, this.editor, this.librarian, this.basher, this.researcher, this.thinker, this.reviewer, this.architect);
     if (name === 'vault_save') this.vault.writeNote(args.name as string, args.content as string);
     log.tool(name, args, result.slice(0, 200));
+    this.emit({ type: 'done', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args) + ' → ✓' });
     return { result, retries };
   }
 
@@ -265,10 +311,12 @@ export class Orchestrator {
     try {
       const recent = this.conversation.slice(-6);
       const text = recent.map(m => `${m.role}: ${m.content.slice(0, 200)}`).join('\n');
-      const r = await chatCompletion({ model: 'deepseek-chat', messages: [{ role: 'user', content: buildSummarizePrompt(text) }], temperature: 0.3, max_tokens: 200 });
+      const r = await chatCompletion({ model: this.currentModel || 'deepseek-chat', messages: [{ role: 'user', content: buildSummarizePrompt(text) }], temperature: 0.3, max_tokens: 200 });
       const j = r.content?.match(/\{[\s\S]*\}/);
       if (j) { const p = JSON.parse(j[0]); if (p.summary) this.vault.autoSave('context', `[summary]\n${p.summary}`); }
-    } catch {}
+    } catch (e: unknown) {
+      log.warn('autoSummary failed', { error: e instanceof Error ? e.message : String(e) });
+    }
   }
 
   private getTools(): ToolDefinition[] {
@@ -288,7 +336,7 @@ export class Orchestrator {
       d('read_file', 'Lee archivo', { filePath: { type: 'string' } }, ['filePath']),
       d('write_file', 'Crea/sobrescribe archivo', { filePath: { type: 'string' }, content: { type: 'string' } }, ['filePath', 'content']),
       d('grep', 'Busca texto en archivos', { query: { type: 'string' }, filePattern: { type: 'string' } }, ['query']),
-      d('str_replace', 'Reemplaza texto en archivo', { filePath: { type: 'string' }, old_str: { type: 'string' }, new_str: { type: 'string' } }, ['filePath', 'old_str', 'new_str']),
+      d('str_replace', 'Reemplaza texto en archivo', { filePath: { type: 'string' }, oldStr: { type: 'string' }, newStr: { type: 'string' } }, ['filePath', 'oldStr', 'newStr']),
       d('browse_url', 'Abre URL en navegador', { url: { type: 'string' } }, ['url']),
       d('open_app', 'Abre aplicacion', { app: { type: 'string' } }, ['app']),
       d('analyze_document', 'Analiza documento (PDF, DOCX, XLSX)', { filePath: { type: 'string' } }, ['filePath']),
@@ -317,12 +365,12 @@ function looksLikeFunctionCallStart(buf: string): boolean {
   const t = buf.trimStart();
   if (t.startsWith('{"type":"function"') || t.startsWith('{"type":"function"') || t.startsWith('[{"type":"function"')) return true;
   if (t.startsWith('{') || t.startsWith('[')) {
-    try { const p = JSON.parse(t); return !!(p?.type === 'function' || (Array.isArray(p) && p[0]?.type === 'function')); } catch {}
+    try { const p = JSON.parse(t); return !!(p?.type === 'function' || (Array.isArray(p) && p[0]?.type === 'function')); } catch { /* JSON parse attempt */ }
   }
   return false;
 }
 
-function tryParseTextToolCalls(content: string | null): Array<{ id: string; type: string; function: { name: string; arguments: string } }> | null {
+function tryParseTextToolCalls(content: string | null): Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> | null {
   if (!content) return null;
   const trimmed = content.trim();
   try {
@@ -332,23 +380,23 @@ function tryParseTextToolCalls(content: string | null): Array<{ id: string; type
     }
     if (Array.isArray(parsed)) {
       const tcs = parsed.filter(p => p.type === 'function' && p.name).map((p, i) => ({
-        id: 'fc_' + (p.name || i), type: 'function', function: { name: p.name, arguments: JSON.stringify(p.parameters || {}) }
+        id: 'fc_' + (p.name || i), type: 'function' as const, function: { name: p.name, arguments: JSON.stringify(p.parameters || {}) }
       }));
       if (tcs.length) return tcs;
     }
-  } catch {}
+  } catch { /* JSON parse fallback */ }
   const singleMatch = trimmed.match(/\{"type"\s*:\s*"function"\s*,\s*"name"\s*:\s*"([^"]+)"\s*,\s*"parameters"\s*:\s*(\{[\s\S]*?\})\s*\}/);
   if (singleMatch) {
-    try { const p = JSON.parse(singleMatch[2]); return [{ id: 'fc_' + singleMatch[1], type: 'function', function: { name: singleMatch[1], arguments: JSON.stringify(p) } }]; } catch {}
+    try { const p = JSON.parse(singleMatch[2]); return [{ id: 'fc_' + singleMatch[1], type: 'function', function: { name: singleMatch[1], arguments: JSON.stringify(p) } }]; } catch { /* parse attempt */ }
   }
   const arrayMatch = trimmed.match(/\[\s*\{[^]*?"type"\s*:\s*"function"[^]*?\}\s*\]/);
   if (arrayMatch) {
     try {
       const arr = JSON.parse(arrayMatch[0]);
       if (Array.isArray(arr)) return arr.filter(p => p.type === 'function' && p.name).map((p, i) => ({
-        id: 'fc_' + (p.name || i), type: 'function', function: { name: p.name, arguments: JSON.stringify(p.parameters || {}) }
+        id: 'fc_' + (p.name || i), type: 'function' as const, function: { name: p.name, arguments: JSON.stringify(p.parameters || {}) }
       }));
-    } catch {}
+    } catch { /* JSON parse fallback */ }
   }
   return null;
 }

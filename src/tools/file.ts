@@ -50,7 +50,7 @@ export function listFiles(dir: string, projectDir: string, maxDepth = 4): string
           files.push(relPath);
         }
       }
-    } catch {}
+    } catch { /* skip unreadable directory */ }
   };
   scan(resolved, 0);
   return files.sort();
@@ -92,7 +92,7 @@ export function searchInFiles(query: string, projectDir: string, filePattern?: s
           if (results.length >= 50) break;
         }
       }
-    } catch {}
+    } catch { /* skip unreadable directory */ }
     if (results.length >= 50) break;
   }
   return results;

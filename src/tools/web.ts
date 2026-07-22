@@ -6,8 +6,9 @@ import * as https from 'https';
 export function webSearch(query: string): Promise<string> {
   return new Promise(resolve => {
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    https.get(url, {
+    const req = https.get(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      timeout: 10000,
     }, res => {
       let data = '';
       res.on('data', c => data += c);
@@ -32,15 +33,16 @@ export function webSearch(query: string): Promise<string> {
           : `Sin resultados para: ${query}`,
         );
       });
-    }).on('error', e => resolve('Error de busqueda: ' + e.message));
+    });
+    req.on('timeout', () => { req.destroy(); resolve('Error de busqueda: timeout (10s)'); });
+    req.on('error', e => resolve('Error de busqueda: ' + e.message));
   });
 }
 
 export async function fetchURL(url: string): Promise<string> {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
     const text = await response.text();
-    // Strip HTML tags for readability
     return text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 5000);
   } catch (e: unknown) {
     return 'Error al obtener URL: ' + (e instanceof Error ? e.message : String(e));

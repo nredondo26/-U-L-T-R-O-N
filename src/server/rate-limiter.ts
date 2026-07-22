@@ -16,13 +16,17 @@ export class RateLimiter {
 
   check(ip: string, url: string | undefined): RateLimitResult {
     const now = Date.now();
-    let entry = this.hits.get(ip);
+    const endpoint = url?.split('?')[0] || 'default';
+    const key = ip + '|' + endpoint;
+    const defaultLimit = this.limits.default || 9999;
+
+    let entry = this.hits.get(key);
     if (!entry || now > entry.reset) {
       entry = { count: 0, reset: now + this.windowMs };
-      this.hits.set(ip, entry);
+      this.hits.set(key, entry);
     }
     entry.count++;
-    const limit = this.limits[url || ''] || this.limits.default || 9999;
+    const limit = this.limits[endpoint] ?? this.limits[url || ''] ?? defaultLimit;
     return { limited: entry.count > limit, remaining: Math.max(0, limit - entry.count), reset: entry.reset };
   }
 

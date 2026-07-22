@@ -30,7 +30,7 @@ export class SessionMemory {
     try {
       const data = loadJSON<SessionMemoryData | null>(this.persistFile, null);
       if (data?.sessionId && Array.isArray(data.events)) return data;
-    } catch {}
+    } catch { /* session cleanup non-critical */ }
     return null;
   }
 
