@@ -114,6 +114,15 @@ export function startWebServer(
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
+  process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught exception:', err);
+    shutdown();
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled rejection:', reason);
+    shutdown();
+  });
+
   return server;
 }
 
@@ -123,7 +132,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse, orch: Orche
   try {
     const body = await readBody(req);
     const { message, model: requestedModel } = JSON.parse(body);
-    if (!message) { res.writeHead(400); res.end('missing message'); return; }
+    if (!message) { safeJson(res, 400, { error: 'missing message' }); return; }
 
     if (requestedModel) orch.setCurrentModel(requestedModel);
 
@@ -134,6 +143,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse, orch: Orche
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
     });
 
     res.write(JSON.stringify({ type: 'init', model: orch.getCurrentModel(), stats: orch.getStats() }) + '\n');
@@ -161,12 +171,15 @@ async function handleChat(req: IncomingMessage, res: ServerResponse, orch: Orche
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[chat] Error:', msg);
-    try {
-      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-      res.write(JSON.stringify({ type: 'error', error: msg }) + '\n');
-      res.end();
-    } catch {}
+    safeJson(res, 200, { type: 'error', error: msg });
   }
+}
+
+function safeJson(res: ServerResponse, status: number, data: unknown): void {
+  try {
+    if (!res.headersSent) res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch {}
 }
 
 function handleModels(_req: IncomingMessage, res: ServerResponse, orch: Orchestrator) {
@@ -248,16 +261,17 @@ function serveStatic(req: IncomingMessage, res: ServerResponse) {
     res.writeHead(403); res.end('Forbidden'); return;
   }
 
+  const cacheHeaders = fullPath.endsWith('.html') ? { 'Cache-Control': 'no-cache, no-store, must-revalidate' } : { 'Cache-Control': 'public, max-age=3600' };
   try {
     if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
       const content = fs.readFileSync(fullPath);
       const mime = getMime(fullPath);
-      res.writeHead(200, { 'Content-Type': mime });
+      res.writeHead(200, { 'Content-Type': mime, ...cacheHeaders });
       res.end(content);
     } else {
       const indexFile = path.join(STATIC_DIR, 'index.html');
       if (fs.existsSync(indexFile)) {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
         res.end(fs.readFileSync(indexFile));
       } else {
         res.writeHead(404); res.end('Not found');

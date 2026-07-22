@@ -28,10 +28,11 @@ function getClient(baseURL: string, apiKey: string): OpenAI {
   return clientCache.get(key)!;
 }
 
-function getModelCandidates(): ModelCandidate[] {
+function getModelCandidates(toolsRequired?: boolean): ModelCandidate[] {
   const candidates: ModelCandidate[] = [];
   for (const p of getProviders()) {
     for (const m of p.models) {
+      if (toolsRequired && m.tools === false) continue;
       const health = getModelHealth(m.id);
       candidates.push({
         provider: p.name,
@@ -41,6 +42,7 @@ function getModelCandidates(): ModelCandidate[] {
         apiKey: p.apiKey,
         codingScore: m.codingScore,
         latencyMs: health.latencyMs ?? undefined,
+        tools: m.tools !== false,
       });
     }
   }
@@ -91,6 +93,8 @@ export class SmartRouter {
     onChunk?: StreamChunkHandler,
     onSwitch?: (event: ModelSwitchEvent) => void,
   ): Promise<LLMCompletionResponse> {
+    const needsTools = req.tools !== undefined && req.tools.length > 0;
+
     if (this.config.strategy === 'fusion') {
       return this.completeFusion(req, onChunk, onSwitch);
     }
@@ -98,7 +102,7 @@ export class SmartRouter {
     const cleanMessages = sanitizeMessages(req.messages);
     const cleanReq = { ...req, messages: cleanMessages };
 
-    let candidates = getModelCandidates();
+    let candidates = getModelCandidates(needsTools);
     if (candidates.length === 0) throw new Error('No hay modelos LLM configurados.');
 
     // If a specific model was requested, prefer it but keep fallbacks

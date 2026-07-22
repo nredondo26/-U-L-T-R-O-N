@@ -13,6 +13,7 @@ export interface ModelEntry {
   id: string;
   free: boolean;
   codingScore?: number;
+  tools?: boolean;
 }
 
 export interface LLMCompletionRequest {

@@ -6,6 +6,7 @@ export interface ModelCandidate {
   apiKey: string;
   codingScore?: number;
   latencyMs?: number;
+  tools?: boolean;
 }
 
 export interface ScoredModel extends ModelCandidate {

@@ -3,8 +3,8 @@ import type { LLMProvider, ModelEntry } from './types';
 import { isModelHealthy, getHealthyModels } from './health';
 import { runDiscovery } from './discovery';
 
-function M(id: string, free = false, codingScore?: number): ModelEntry {
-  return { id, free, codingScore };
+function M(id: string, free = false, codingScore?: number, tools?: boolean): ModelEntry {
+  return { id, free, codingScore, tools };
 }
 
 function buildBaseProviders(): LLMProvider[] {
@@ -41,17 +41,17 @@ function buildBaseProviders(): LLMProvider[] {
         M('deepseek-ai/deepseek-v4-flash', true, 90), M('deepseek-ai/deepseek-v4-pro', true, 85),
         M('deepseek-ai/deepseek-coder-6.7b-instruct', true, 85),
         M('meta/llama-3.1-8b-instruct', true), M('meta/llama-3.1-70b-instruct', true, 72),
-        M('meta/llama-3.2-1b-instruct', true, 30), M('meta/llama-3.2-3b-instruct', true, 40),
+        M('meta/llama-3.2-1b-instruct', true, 30, false), M('meta/llama-3.2-3b-instruct', true, 40, false),
         M('meta/llama-3.3-70b-instruct', true, 75), M('meta/llama-4-maverick-17b-128e-instruct', true, 80),
-        M('meta/codellama-70b', true, 78),
+        M('meta/codellama-70b', true, 78, false),
         M('nvidia/llama-3.1-nemotron-nano-8b-v1', true), M('nvidia/llama-3.3-nemotron-super-49b-v1', true),
-        M('nvidia/llama-3.3-nemotron-super-49b-v1_5', true), M('nvidia/nemotron-mini-4b-instruct', true),
+        M('nvidia/llama-3.3-nemotron-super-49b-v1_5', true), M('nvidia/nemotron-mini-4b-instruct', true, undefined, false),
         M('nvidia/nemotron-3-nano-30b-a3b', true), M('nvidia/nemotron-3-super-120b-a12b', true),
         M('nvidia/nemotron-3-ultra-550b-a55b', true), M('nvidia/mistral-nemotron', true),
         M('mistralai/ministral-14b-instruct-2512', true), M('mistralai/mistral-large-3-675b-instruct-2512', true),
         M('mistralai/mistral-medium-3.5-128b', true), M('mistralai/mistral-small-4-119b-2603', true),
         M('mistralai/mixtral-8x7b-instruct-v0.1', true), M('mistralai/codestral-22b-instruct-v0.1', true, 82),
-        M('google/gemma-2-2b-it', true), M('google/gemma-3n-e2b-it', true), M('google/gemma-3n-e4b-it', true),
+        M('google/gemma-2-2b-it', true, undefined, false), M('google/gemma-3n-e2b-it', true, undefined, false), M('google/gemma-3n-e4b-it', true, undefined, false),
         M('google/gemma-4-31b-it', true), M('nvidia/dracarys-llama-3.1-70b-instruct', true),
         M('nvidia/gpt-oss-20b', true), M('nvidia/gpt-oss-120b', true), M('nvidia/laguna-xs-2.1', true),
         M('moonshotai/kimi-k2.6', true), M('minimax/minimax-m2.7', true), M('zhipu/glm-5.2', true),
