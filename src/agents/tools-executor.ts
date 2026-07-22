@@ -1,5 +1,5 @@
 // src/agents/tools-executor.ts
-// Ejecucion de herramientas con retry y paralelizacion
+// Ejecucion de herramientas con retry, paralelizacion y compression
 
 import type { ToolCall } from '../shared/types';
 import type { AgentResult } from './types';
@@ -12,6 +12,7 @@ import { speak } from '../tools/voice';
 import { mouseClick, mouseMove, keyboardType, keyboardPress, screenCapture, getScreenInfo } from '../tools/automation';
 import { createTask, executeTask, smartClick, smartType, openAndFocus, getQueueStatus } from '../tools/auto-pilot';
 import { saveToDesktop, saveToFile, checkFile, getDesktopPath } from '../tools/file-ops';
+import { compressOutput } from '../llm/compression/index';
 import { execSync } from 'child_process';
 import { EditorAgent } from './editor';
 import { LibrarianAgent } from './librarian';
@@ -42,7 +43,8 @@ export async function executeTool(
         name, args, projectDir,
         editor, librarian, basher, researcher, thinker, reviewer, architect,
       );
-      return { result, retries: attempt };
+      const compressed = compressOutput(name, result);
+      return { result: compressed, retries: attempt };
     } catch (e: unknown) {
       lastError = e instanceof Error ? e.message : String(e);
       if (attempt < MAX_RETRIES) {

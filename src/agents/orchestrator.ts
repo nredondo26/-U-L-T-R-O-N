@@ -229,7 +229,8 @@ export class Orchestrator {
 
     this.emit({ type: 'thought', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
 
-    const sp = buildSystemPrompt(this.vault, this.session, this.configStore, this.config.projectDir, '').slice(0, 5000);
+    const graphCtx = this.graphLearner.buildGraphContext(input);
+    const sp = buildSystemPrompt(this.vault, this.session, this.configStore, this.config.projectDir, graphCtx).slice(0, 5000);
     this.stream('');
     const msgs: ChatMessage[] = [{ role: 'system', content: sp }, ...this.conversation.slice(-6), { role: 'user', content: input }];
     const tools = this.getTools();
