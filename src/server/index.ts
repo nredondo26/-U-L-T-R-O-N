@@ -38,7 +38,12 @@ export function startWebServer(
   orchestrator: Orchestrator,
   port = 3456,
 ): http.Server {
+  let activeRequests = 0;
   const server = http.createServer((req: IncomingMessage, res: ServerResponse) => {
+    activeRequests++;
+    const startTime = Date.now();
+    const logReq = () => console.log(`[http] ${req.method} ${req.url} active=${activeRequests} time=${Date.now()-startTime}ms`);
+    res.on('finish', () => { activeRequests--; logReq(); });
     applySecurityHeaders(req, res);
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
     if (req.url?.startsWith('/api/')) {
