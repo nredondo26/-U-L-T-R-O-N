@@ -87,13 +87,71 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .agent-progress-bar.done{background:var(--success);width:100%!important}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* Agent action log (collapsible) */
-.agent-log{display:none;padding:0 12px 8px 50px;font-size:10px;color:var(--dim);max-height:120px;overflow-y:auto}
-.agent-log.open{display:block}
-.agent-log::-webkit-scrollbar{width:2px}.agent-log::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.agent-log-entry{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:6px}
-.agent-log-time{color:var(--dim);flex-shrink:0;font-family:monospace;font-size:9px}
-.agent-log-text{color:var(--text);opacity:.7}
+/* === AGENT WORK ANIMATIONS === */
+.agent-icon{position:relative;overflow:hidden}
+.agent-icon .worker{position:absolute;font-size:18px;transition:all .3s ease;opacity:0;transform:scale(0)}
+.agent-item.active .agent-icon .worker{opacity:1;transform:scale(1)}
+.agent-item.action .agent-icon .worker{opacity:1;transform:scale(1)}
+/* Cerebro - pulsing core + orbiting sparks */
+.agent-icon.cerebro .worker::before{content:'🧠';animation:brainThink 1.5s ease-in-out infinite;display:block}
+@keyframes brainThink{0%,100%{transform:scale(1) rotate(0deg)}25%{transform:scale(1.2) rotate(-5deg)}50%{transform:scale(1) rotate(0deg)}75%{transform:scale(1.15) rotate(5deg)}}
+.agent-icon.cerebro .worker::after{content:'⚡';position:absolute;top:-2px;right:-2px;font-size:8px;animation:sparkOrbit 1s linear infinite}
+@keyframes sparkOrbit{0%{transform:rotate(0deg) translateX(8px)}100%{transform:rotate(360deg) translateX(8px)}}
+/* Visión - blueprint drawing */
+.agent-icon.vision .worker::before{content:'👁️';animation:visionScan 2s ease-in-out infinite;display:block}
+@keyframes visionScan{0%,100%{transform:scaleX(1)}50%{transform:scaleX(0.3)}}
+.agent-icon.vision .worker::after{content:'📐';position:absolute;bottom:-4px;right:-6px;font-size:10px;animation:bounceDraw .8s ease-in-out infinite}
+@keyframes bounceDraw{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-6px) rotate(15deg)}}
+/* Artífice - pencil writing */
+.agent-icon.artifice .worker::before{content:'✍️';animation:penWrite 1s steps(3) infinite;display:block}
+@keyframes penWrite{0%{transform:translateX(-3px) rotate(-10deg)}33%{transform:translateX(0) rotate(0deg)}66%{transform:translateX(3px) rotate(10deg)}100%{transform:translateX(0) rotate(0deg)}}
+.agent-icon.artifice .worker::after{content:'📄';position:absolute;bottom:0;left:2px;font-size:10px;animation:paperSlide .6s ease-in-out infinite alternate}
+@keyframes paperSlide{from{transform:translateY(2px)}to{transform:translateY(-2px)}}
+/* Sabio - book flipping */
+.agent-icon.sabio .worker::before{content:'📖';animation:bookFlip 1.2s ease-in-out infinite;display:block}
+@keyframes bookFlip{0%,100%{transform:rotateY(0deg)}50%{transform:rotateY(30deg) scaleX(0.9)}}
+.agent-icon.sabio .worker::after{content:'🔖';position:absolute;top:-2px;right:0;font-size:8px;animation:bookmarkFloat 1.5s ease-in-out infinite}
+@keyframes bookmarkFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+/* Ejecutor - terminal typing */
+.agent-icon.ejecutor .worker::before{content:'💻';animation:terminalGlow 1s ease-in-out infinite;display:block}
+@keyframes terminalGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3) drop-shadow(0 0 3px currentColor)}}
+.agent-icon.ejecutor .worker::after{content:'▊';position:absolute;bottom:3px;right:3px;font-size:8px;animation:blink 1s step-end infinite;color:var(--success)}
+@keyframes blink{50%{opacity:0}}
+/* Explorador - moving magnifying glass */
+.agent-icon.explorador .worker::before{content:'🔍';animation:searchMove 1.5s ease-in-out infinite;display:block}
+@keyframes searchMove{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(3px,-3px) scale(1.1)}50%{transform:translate(-2px,2px) scale(1)}75%{transform:translate(-3px,-2px) scale(1.1)}}
+.agent-icon.explorador .worker::after{content:'🌐';position:absolute;font-size:7px;animation:dataPulse .7s ease-in-out infinite;bottom:0}
+@keyframes dataPulse{0%,100%{opacity:0;transform:scale(0.5)}50%{opacity:1;transform:scale(1)}}
+/* Estratega - chess pieces */
+.agent-icon.estratega .worker::before{content:'♟️';animation:pieceMove 1.8s ease-in-out infinite;display:block}
+@keyframes pieceMove{0%,100%{transform:translateY(0) rotate(0deg)}30%{transform:translateY(-6px) rotate(-5deg)}60%{transform:translateY(0) rotate(0deg)}80%{transform:translateY(-4px) rotate(5deg)}}
+.agent-icon.estratega .worker::after{content:'📋';position:absolute;bottom:0;right:0;font-size:9px;animation:clipboardCheck 2s ease-in-out infinite}
+@keyframes clipboardCheck{0%,80%,100%{transform:rotate(0deg)}85%{transform:rotate(-15deg)}90%{transform:rotate(10deg)}95%{transform:rotate(-5deg)}}
+/* Juez - weighing scales */
+.agent-icon.juez .worker::before{content:'⚖️';animation:scaleBalance 2s ease-in-out infinite;display:block}
+@keyframes scaleBalance{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+.agent-icon.juez .worker::after{content:'✅';position:absolute;bottom:-2px;right:-4px;font-size:9px;animation:checkStamp .6s ease-out infinite}
+@keyframes checkStamp{0%{transform:scale(0) rotate(-20deg);opacity:0}60%{transform:scale(1.3) rotate(0deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}
+
+/* === WORKING FACTORY SCENE (chat top banner) === */
+#workBanner{display:none;align-items:center;gap:8px;padding:4px 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow:hidden;height:32px}
+#workBanner.show{display:flex}
+#workBanner .work-label{font-size:10px;color:var(--dim);white-space:nowrap;flex-shrink:0}
+#workBanner .work-line{flex:1;display:flex;align-items:center;gap:0;position:relative;height:100%}
+#workBanner .work-mini{font-size:14px;position:absolute;animation:workerWalk 4s linear infinite;opacity:.6}
+#workBanner .work-mini:nth-child(1){animation-delay:0s}
+#workBanner .work-mini:nth-child(2){animation-delay:.5s}
+#workBanner .work-mini:nth-child(3){animation-delay:1s}
+#workBanner .work-mini:nth-child(4){animation-delay:1.5s}
+#workBanner .work-mini:nth-child(5){animation-delay:2s}
+#workBanner .work-mini:nth-child(6){animation-delay:2.5s}
+#workBanner .work-mini:nth-child(7){animation-delay:3s}
+#workBanner .work-mini:nth-child(8){animation-delay:3.5s}
+@keyframes workerWalk{0%{left:-20px;transform:translateY(0)}10%{transform:translateY(-4px)}20%{transform:translateY(0)}30%{transform:translateY(-4px)}40%{transform:translateY(0)}100%{left:calc(100% + 20px);transform:translateY(0)}}
+#workBanner .work-item{position:absolute;font-size:13px}
+/* Conveyor belt particles */
+#workBanner .work-doc{position:absolute;font-size:10px;animation:docSlide 3s linear infinite}
+@keyframes docSlide{0%{left:-16px;opacity:0}5%{opacity:.7}95%{opacity:.7}100%{left:calc(100% + 16px);opacity:0}}
 
 @media(max-width:768px){.sidebar{display:none}.msg{max-width:100%}.header-stats{display:none}}
 </style>
@@ -117,6 +175,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 </div>
 <div class="main">
   <div class="chat-panel">
+    <div id="workBanner"><span class="work-label">⚙ Trabajando:</span><div class="work-line" id="workLine"></div></div>
     <div class="messages" id="messages"><div class="msg system" id="connectingMsg">Connecting...</div></div>
     <div class="input-wrap">
       <textarea id="input" placeholder="Send a message..." rows="1"></textarea>
@@ -181,12 +240,18 @@ const pendingQueue=[];
 const agentLogs = {}; // agentId -> [{time,text}]
 const agentDoneTimers = {}; // agentId -> timeout
 
+const agentIcons = {
+  'Orchestrator':'cerebro','Architect':'vision','Editor':'artifice','Librarian':'sabio',
+  'Basher':'ejecutor','Researcher':'explorador','Thinker':'estratega','Reviewer':'juez'
+};
+
 function renderAgentList(){
   const list=document.getElementById('agentList');list.innerHTML='';
   for(const a of agents){
+    const iconClass = agentIcons[a.id] || '';
     const el=document.createElement('div');el.className='agent-item';el.id='agent-'+a.id;
     el.innerHTML='<div class="agent-header">'+
-      '<div class="agent-icon" style="background:'+a.color+'20;color:'+a.color+'">'+a.icon+'</div>'+
+      '<div class="agent-icon '+iconClass+'" style="background:'+a.color+'20;color:'+a.color+'">'+a.icon+'<span class="worker"></span></div>'+
       '<div class="agent-info">'+
         '<div class="agent-name">'+(a.displayName||a.id)+'</div>'+
         '<div class="agent-status-text" id="stxt-'+a.id+'">idle</div>'+
@@ -229,37 +294,37 @@ function setAgentStatus(id,status,msg){
   if(agentDoneTimers[id]){clearTimeout(agentDoneTimers[id]);delete agentDoneTimers[id]}
 
   if(status==='active'||status==='action'){
-    item.className='agent-item active';
+    item.className='agent-item active action';
     stxt.className='agent-status-text active';
     stxt.textContent=msg||'trabajando...';
     prog.className='agent-progress-bar active';
     chk.classList.remove('show');
-    // Add to log
     if(msg){agentLogs[id].push({time:new Date().toLocaleTimeString(),text:msg});if(agentLogs[id].length>50)agentLogs[id].splice(0,agentLogs[id].length-50)}
     renderAgentLog(id);
+    updateWorkBanner();
   } else if(status==='thought'){
     item.className='agent-item active';
     stxt.className='agent-status-text active';
     stxt.textContent=msg||'pensando...';
     prog.className='agent-progress-bar active';
     chk.classList.remove('show');
+    updateWorkBanner();
   } else if(status==='done'||status==='result'){
     item.className='agent-item done';
     stxt.className='agent-status-text done';
     stxt.textContent=msg||'✓ completado';
     prog.className='agent-progress-bar done';
     chk.classList.add('show');
-    // Free after 4s
     agentDoneTimers[id]=setTimeout(()=>{
       item.className='agent-item';
       stxt.className='agent-status-text';
       stxt.textContent='idle';
       prog.className='agent-progress-bar';
-      prog.style.width='0%';
       chk.classList.remove('show');
       delete agentDoneTimers[id];
-      updateActiveCount();
+      updateWorkBanner();
     },4000);
+    updateWorkBanner();
   } else {
     // idle / error
     item.className=status==='error'?'agent-item done':'agent-item';
@@ -274,6 +339,27 @@ function setAgentStatus(id,status,msg){
 function updateActiveCount(){
   const count=document.querySelectorAll('.agent-item.active').length;
   document.getElementById('activeCount').textContent=count+' activo'+(count!==1?'s':'');
+  // Work banner
+  const banner=document.getElementById('workBanner');
+  const line=document.getElementById('workLine');
+  if(count>0){
+    banner.classList.add('show');
+    const ac=document.querySelectorAll('.agent-item.active');
+    const icons=[];
+    ac.forEach(el=>{
+      const ael=el.querySelector('.agent-icon');
+      if(ael){
+        const color=ael.style.color;
+        const icon=ael.textContent.trim().charAt(0)===ael.textContent.trim().charAt(0)?ael.textContent.trim():'⬡';
+        icons.push({icon,color});
+      }
+    });
+    line.innerHTML=icons.map((ic,i)=>'<span class="work-mini" style="color:'+ic.color+';animation-delay:'+(i*0.5)+'s">'+ic.icon+'</span>').join('')+
+      '<span class="work-doc" style="animation-delay:.2s">📄</span><span class="work-doc" style="animation-delay:1.5s">📋</span><span class="work-doc" style="animation-delay:2.8s">📦</span>';
+  }else{
+    banner.classList.remove('show');
+    line.innerHTML='';
+  }
 }
 
 // Poll agent states from backend every 2s
