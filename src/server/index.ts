@@ -30,11 +30,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 function findStaticDir(): string {
   const candidates = [
-    path.join(__dirname, '..', 'src', 'server', 'public'),
-    path.join(__dirname, '..', '..', 'src', 'server', 'public'),
-    path.join(__dirname, 'public'),
-    path.join(__dirname, '..', 'server', 'public'),
-    path.join(process.cwd(), 'src', 'server', 'public'),
+    path.join(__dirname, 'src', 'server', 'public'),       // bun run dist/index.js
+    path.join(__dirname, '..', 'src', 'server', 'public'),  // npm start from dist/
+    path.join(__dirname, '..', '..', 'src', 'server', 'public'), // run from dist/sub/
+    path.join(__dirname, 'public'),                          // bun build --compile (same dir)
+    path.join(path.dirname(process.execPath), 'public'),     // compiled exe + public folder
+    path.join(path.dirname(process.execPath), 'src', 'server', 'public'),
+    path.join(process.cwd(), 'public'),                      // launched from project root
+    path.join(process.cwd(), 'src', 'server', 'public'),     // dev mode
+    path.join(process.cwd(), 'dist', 'public'),              // production with dist/public
   ];
   for (const d of candidates) {
     try { if (fs.existsSync(path.join(d, 'index.html'))) return d; } catch { /* dir read failed */ }

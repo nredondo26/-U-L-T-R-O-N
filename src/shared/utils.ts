@@ -39,7 +39,11 @@ export function sanitizeFilename(name: string): string {
 export function loadEnv(envPath?: string): void {
   const tryPaths = envPath
     ? [envPath]
-    : [path.join(process.cwd(), '.env'), path.join(process.cwd(), '..', '.env')];
+    : [
+        path.join(process.cwd(), '.env'),
+        path.join(process.cwd(), '..', '.env'),
+        path.join(path.dirname(process.execPath), '.env'),
+      ];
   for (const p of tryPaths) {
     try {
       if (fs.existsSync(p)) {
