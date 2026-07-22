@@ -7,19 +7,19 @@
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="/favicon.ico">
 <style>
-:root{--bg:#08080c;--surface:#0f0f16;--border:#1c1c2a;--hover:#161626;--accent:#38bdf8;--accent-muted:rgba(56,189,248,0.08);--accent-dim:rgba(56,189,248,0.15);--text:#e4e6ed;--dim:#585e6e;--success:#34d399;--warn:#facc15;--error:#f87171;--font:'Inter',system-ui,-apple-system,sans-serif;--radius:10px;--radius-sm:6px}
+:root{--bg:#f8f9fb;--surface:#ffffff;--border:#e2e5ea;--hover:#f0f2f5;--accent:#2563eb;--accent-muted:rgba(37,99,235,0.06);--accent-dim:rgba(37,99,235,0.12);--text:#1a1d23;--dim:#8b92a0;--success:#16a34a;--warn:#ca8a04;--error:#dc2626;--font:'Inter',system-ui,-apple-system,sans-serif;--radius:10px;--radius-sm:6px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--dim)}
 
 /* AUTH OVERLAY */
-#authOverlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,8,12,0.95);backdrop-filter:blur(20px);flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#authOverlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(248,249,251,0.97);backdrop-filter:blur(20px);flex-direction:column;align-items:center;justify-content:center;gap:16px}
 #authOverlay.show{display:flex}
 #authOverlay h2{font-size:28px;color:var(--text);font-weight:300;letter-spacing:8px;text-transform:uppercase;margin-bottom:8px}
 #authOverlay h2 span{color:var(--accent);font-weight:600}
-#authOverlay input{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 18px;color:var(--text);font-size:14px;width:300px;outline:none;text-align:center;font-family:var(--font);transition:border-color .2s,box-shadow .2s}
+#authOverlay input{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px 18px;color:var(--text);font-size:14px;width:300px;outline:none;text-align:center;font-family:var(--font);transition:border-color .2s,box-shadow .2s}
 #authOverlay input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
-#authOverlay button{background:var(--accent);color:var(--bg);border:none;border-radius:var(--radius);padding:10px 28px;font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);letter-spacing:.3px;transition:opacity .2s}
+#authOverlay button{background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:10px 28px;font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);letter-spacing:.3px;transition:opacity .2s}
 #authOverlay button:hover{opacity:.85}
 #authOverlay .auth-error{color:var(--error);font-size:12px;display:none}
 #authOverlay .auth-skip{font-size:11px;color:var(--dim);cursor:pointer;background:none;border:none;margin-top:8px;opacity:.6;transition:opacity .2s}
@@ -124,9 +124,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 
 /* AGENT ANIMATIONS */
 .agent-icon{position:relative;overflow:visible}
-.agent-icon .worker{position:absolute;font-size:18px;transition:all .3s ease;opacity:0;transform:scale(0);inset:0;display:flex;align-items:center;justify-content:center}
-.agent-item.active .agent-icon .worker,.agent-item.action .agent-icon .worker{opacity:1;transform:scale(1)}
-.agent-item.active .agent-icon{color:transparent!important}
+.agent-icon .worker{position:absolute;font-size:22px;transition:all .3s ease;opacity:0;transform:scale(0);inset:-2px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.agent-item.active .agent-icon .worker,.agent-item.action .agent-icon .worker{opacity:1;transform:scale(1.1)}
+.agent-item.active .agent-icon{background:var(--accent-dim)!important}
 .agent-icon.cerebro .worker::before{content:'🧠';animation:brainThink 1.5s ease-in-out infinite}
 @keyframes brainThink{0%,100%{transform:scale(1) rotate(0deg)}25%{transform:scale(1.15) rotate(-5deg)}50%{transform:scale(1) rotate(0deg)}75%{transform:scale(1.1) rotate(5deg)}}
 .agent-icon.cerebro .worker::after{content:'⚡';position:absolute;top:-4px;right:-4px;font-size:7px;animation:sparkOrbit 1s linear infinite}
