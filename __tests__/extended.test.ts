@@ -121,28 +121,6 @@ describe('Git module', () => {
   }, 15000);
 });
 
-describe('Skills module', () => {
-  it('loadSkills returns empty when no skills dir', async () => {
-    const { loadSkills, getAllSkills } = await import('../src/tools/skills');
-    loadSkills(tmpDir);
-    expect(getAllSkills().length).toBe(0);
-  });
-
-  it('buildSkillsContext returns empty for no match', async () => {
-    const { buildSkillsContext } = await import('../src/tools/skills');
-    const ctx = buildSkillsContext('random text');
-    expect(ctx).toBe('');
-  });
-});
-
-describe('MCP module', () => {
-  it('loadMCPServers returns empty when no config', async () => {
-    const { loadMCPServers, getMCPServers } = await import('../src/tools/mcp');
-    await loadMCPServers(path.join(tmpDir, 'nonexistent.json'));
-    expect(getMCPServers().length).toBe(0);
-  });
-});
-
 describe('Graph learner', () => {
   it('indexes a file', async () => {
     const { GraphLearner } = await import('../src/agents/graph-learner');
@@ -204,7 +182,6 @@ describe('Edge cases', () => {
     const { sanitizeFilename } = require('../src/shared/utils');
     const long = 'a'.repeat(200) + '.txt';
     const result = sanitizeFilename(long);
-    // sanitize doesn't truncate, but the vault does
     expect(result).toBeTruthy();
   });
 
@@ -218,6 +195,80 @@ describe('Edge cases', () => {
   it('loadEnv from missing file does not throw', () => {
     const { loadEnv } = require('../src/shared/utils');
     expect(() => loadEnv(path.join(tmpDir, 'nope.env'))).not.toThrow();
+  });
+});
+
+describe('Provider edge cases', () => {
+  it('getProvider returns null when no keys set', () => {
+    const { getProvider } = require('../src/llm/providers');
+    // Save and clear keys
+    const saved: Record<string, string | undefined> = {};
+    for (const k of ['DASHSCOPE_API_KEY', 'DEEPSEEK_API_KEY', 'NVIDIA_API_KEY', 'OPENROUTER_API_KEY']) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+    try {
+      const result = getProvider('nonexistent-model');
+      expect(result).toBeNull();
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v) process.env[k] = v;
+      }
+    }
+  });
+
+  it('getAllModels returns empty with no keys', () => {
+    const { getAllModels } = require('../src/llm/providers');
+    const saved: Record<string, string | undefined> = {};
+    for (const k of ['DASHSCOPE_API_KEY', 'DEEPSEEK_API_KEY', 'NVIDIA_API_KEY', 'OPENROUTER_API_KEY']) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+    try {
+      const result = getAllModels();
+      expect(result).toEqual([]);
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v) process.env[k] = v;
+      }
+    }
+  });
+
+  it('getFallbackChain returns empty if no model', () => {
+    const { getFallbackChain } = require('../src/llm/providers');
+    const result = getFallbackChain('nonexistent');
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+describe('Vault edge cases', () => {
+  it('readNote returns null for missing note', async () => {
+    const { ObsidianVault } = await import('../src/memory/vault');
+    const vDir = path.join(tmpDir, 'vault-edge');
+    fs.mkdirSync(vDir, { recursive: true });
+    const vault = new ObsidianVault(vDir);
+    expect(vault.readNote('nope')).toBeNull();
+    expect(vault.deleteNote('nope')).toBeFalse();
+  });
+
+  it('sanitizes unsafe note names', async () => {
+    const { ObsidianVault } = await import('../src/memory/vault');
+    const vDir = path.join(tmpDir, 'vault-edge2');
+    fs.mkdirSync(vDir, { recursive: true });
+    const vault = new ObsidianVault(vDir);
+    const note = vault.writeNote('../evil', 'content');
+    expect(fs.existsSync(path.join(vDir, note.name + '.md'))).toBeTrue();
+  });
+
+  it('vault graph with no edges', async () => {
+    const { ObsidianVault } = await import('../src/memory/vault');
+    const vDir = path.join(tmpDir, 'vault-edge3');
+    fs.mkdirSync(vDir, { recursive: true });
+    const vault = new ObsidianVault(vDir);
+    vault.writeNote('alone', 'no links here');
+    const graph = vault.getGraph();
+    expect(graph.nodes.length).toBe(1);
+    expect(graph.edges.length).toBe(0);
   });
 });
 

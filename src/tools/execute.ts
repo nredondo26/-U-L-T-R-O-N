@@ -1,6 +1,3 @@
-// src/tools/execute.ts
-// Ejecucion de comandos (usa shell para soportar dir, cd, echo, etc.)
-
 import { exec, spawn } from 'child_process';
 
 export interface ExecResult {

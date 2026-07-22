@@ -1,6 +1,3 @@
-// src/tools/sandbox.ts
-// Ejecucion segura de comandos con confirmacion y allowlist
-
 import { executeCommand } from './execute';
 import { log } from '../shared/logger';
 
@@ -24,7 +21,7 @@ export function getSandboxConfig(): SandboxConfig { return { ...config }; }
 
 export function setSandboxMode(mode: SandboxMode): void {
   config.mode = mode;
-  if (mode === 'deny') config.sessionAllowAll = false; // Reset session allow
+  if (mode === 'deny') config.sessionAllowAll = false;
   log.info(`Sandbox mode: ${mode}`);
 }
 
@@ -38,26 +35,41 @@ export function addAllow(cmd: string): void {
   log.info(`Sandbox allowlist: added ${cmd}`);
 }
 
-export function checkCommand(command: string): { allowed: boolean; reason: string } {
-  // Session allow-all
-  if (config.sessionAllowAll) return { allowed: true, reason: 'session-allow-all' };
+// Check if command contains dangerous shell metacharacters
+function hasShellMetachar(command: string): boolean {
+  const special = /[;&|`$(){}[\]!#~<>*?\\]/;
+  return special.test(command);
+}
 
-  // Check denylist first (dangerous patterns)
+// Check if command executes a dangerous pattern anywhere in the string
+function matchesDenylist(command: string): string | null {
   const lower = command.toLowerCase();
   for (const pattern of config.denylist) {
-    if (lower.includes(pattern.toLowerCase())) {
-      log.warn(`Sandbox: blocked dangerous command`, { command, pattern });
-      return { allowed: false, reason: `Comando bloqueado: contiene "${pattern}". Es peligroso.` };
-    }
+    const p = pattern.toLowerCase();
+    if (lower.includes(p) || lower.split(/\s+/).some(word => word === p)) return pattern;
+  }
+  return null;
+}
+
+export function checkCommand(command: string): { allowed: boolean; reason: string } {
+  if (config.sessionAllowAll) return { allowed: true, reason: 'session-allow-all' };
+
+  const denylistHit = matchesDenylist(command);
+  if (denylistHit) {
+    log.warn(`Sandbox: blocked dangerous command`, { command, pattern: denylistHit });
+    return { allowed: false, reason: `Comando bloqueado: contiene "${denylistHit}".` };
   }
 
-  // Check allowlist (exact match only, no prefix matching)
+  if (hasShellMetachar(command)) {
+    log.warn(`Sandbox: blocked shell metacharacters`, { command });
+    return { allowed: false, reason: 'Comando bloqueado: contiene caracteres especiales del shell (&;|`$(){}[]!#~<>*?\\)' };
+  }
+
   const cmdName = command.split(/\s+/)[0].toLowerCase();
   if (config.allowlist.includes(cmdName)) {
     return { allowed: true, reason: 'allowlist' };
   }
 
-  // Ask mode
   if (config.mode === 'ask') {
     return { allowed: true, reason: 'ask-mode (shown to user)' };
   }

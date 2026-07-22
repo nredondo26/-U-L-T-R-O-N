@@ -2,73 +2,143 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ULTRON — Command Center</title>
+<title>ULTRON</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/favicon.ico">
 <style>
-:root{--bg:#04040c;--surface:#0a0a18;--border:#1a1a2e;--red:#ef4444;--green:#10b981;--blue:#3b82f6;--yellow:#f59e0b;--purple:#8b5cf6;--cyan:#06b6d4;--orange:#f97316;--pink:#ec4899;--text:#c8d0e0;--dim:#4a5570;--wall:#0d0d20}
+:root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2a;--hover:#1a1a28;--accent:#22d3ee;--accent-dim:rgba(34,211,238,0.15);--text:#e2e8f0;--dim:#6b7280;--success:#4ade80;--warn:#fbbf24;--error:#f87171;--font:system-ui,-apple-system,sans-serif}
+
+/* Validation banner (non-blocking, top bar style) */
+#validateBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:var(--surface);border-bottom:1px solid var(--accent);padding:8px 16px;align-items:center;gap:12px}
+#validateBanner.show{display:flex}
+#validateBannerBar{flex:1;max-width:200px;height:3px;background:var(--border);border-radius:3px;overflow:hidden}
+#validateBannerFill{height:100%;background:var(--accent);border-radius:3px;transition:width .15s ease;width:0%}
+#validateBannerLabel{font-size:12px;color:var(--text);white-space:nowrap}
+#validateBannerDetail{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#validateBannerClose{font-size:14px;color:var(--dim);cursor:pointer;padding:0 4px;margin-left:auto;background:none;border:none}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-.header{display:flex;align-items:center;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);gap:12px;min-height:44px}
-.logo{font-weight:800;font-size:15px;color:var(--red);letter-spacing:2px}
-.pulse{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
-.model-select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;outline:none;cursor:pointer;max-width:200px}
-.model-select:focus{border-color:var(--red)}
-.model-select option{background:var(--surface);color:var(--text)}
-.header-stats{font-size:10px;color:var(--dim);margin-left:auto;display:flex;gap:16px;align-items:center}
+body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:14px;line-height:1.5}
+.header{display:flex;align-items:center;padding:0 20px;height:52px;background:var(--surface);border-bottom:1px solid var(--border);gap:16px;flex-shrink:0}
+.logo{font-weight:700;font-size:16px;color:var(--accent);letter-spacing:1px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.model-select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 10px;font-size:12px;outline:none;cursor:pointer;font-family:var(--font)}
+.model-select:focus{border-color:var(--accent)}
+.model-select option{background:var(--surface)}
+.header-stats{font-size:11px;color:var(--dim);display:flex;gap:12px}
 .header-stats span{color:var(--text)}
 .main{display:flex;flex:1;overflow:hidden}
-.chat-panel{width:380px;display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0}
-.messages{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
-.messages::-webkit-scrollbar{width:3px}.messages::-webkit-scrollbar-thumb{background:var(--border)}
-.msg{max-width:90%;padding:8px 12px;border-radius:10px;line-height:1.4;font-size:12px;animation:in .2s}
-@keyframes in{from{opacity:0;transform:translateY(4px)}}
-.msg.user{align-self:flex-end;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.15)}
-.msg.ai{align-self:flex-start;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05)}
-.msg.system{align-self:center;font-size:10px;color:var(--dim);padding:2px 10px;background:var(--surface);border-radius:10px}
-.input-wrap{display:flex;gap:6px;padding:10px 14px;background:var(--surface);border-top:1px solid var(--border)}
-.input-wrap textarea{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:12px;resize:none;outline:none;min-height:36px;max-height:80px;font-family:inherit}
-.input-wrap textarea:focus{border-color:var(--red)}
-.input-wrap button{background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:12px;font-weight:600;min-width:60px}
-/* WORLD */
-.world{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 30%, #0d0d2a 0%, #04040c 70%)}
-.world canvas{position:absolute;inset:0}
+.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0}
+.messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.messages::-webkit-scrollbar{width:4px}.messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.msg{max-width:720px;padding:10px 14px;border-radius:10px;line-height:1.6;font-size:13.5px;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}}
+.msg.user{align-self:flex-end;background:var(--accent-dim);border:1px solid rgba(34,211,238,0.12)}
+.msg.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--border)}
+.msg.system{align-self:center;font-size:11px;color:var(--dim);padding:4px 14px;background:var(--surface);border-radius:12px;border:1px solid var(--border)}
+.msg code{background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px;font-size:12.5px}
+.msg pre{background:rgba(0,0,0,.3);padding:10px 12px;border-radius:8px;overflow-x:auto;margin:6px 0;font-size:12px;border:1px solid var(--border)}
+.typing-indicator{display:flex;gap:3px;padding:4px 0}
+.typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--dim);animation:bounce 1.4s infinite}
+.typing-indicator span:nth-child(2){animation-delay:.2s}
+.typing-indicator span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+.input-wrap{display:flex;gap:8px;padding:12px 20px 16px;background:var(--bg);border-top:1px solid var(--border)}
+.input-wrap textarea{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:13px;resize:none;outline:none;min-height:42px;max-height:120px;font-family:var(--font);transition:border-color .15s}
+.input-wrap textarea:focus{border-color:var(--accent)}
+.input-wrap textarea::placeholder{color:var(--dim)}
+.btn-group{display:flex;gap:8px;flex-shrink:0}
+.send-btn{background:var(--accent);color:#000;border:none;border-radius:8px;padding:0 18px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font);transition:opacity .15s;white-space:nowrap}
+.send-btn:hover{opacity:.85}
+.send-btn:disabled{opacity:.4;cursor:default}
+.stop-btn{background:var(--error);color:#fff;border:none;border-radius:8px;padding:0 14px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font);transition:opacity .15s;white-space:nowrap;display:none}
+.stop-btn:hover{opacity:.85}
+.queue-badge{display:none;align-self:center;font-size:10px;color:var(--warn);padding:2px 8px;background:rgba(251,191,36,0.12);border-radius:10px;white-space:nowrap}
+
+/* Agent sidebar */
+.sidebar{width:260px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-title{padding:12px 16px;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.agent-list{flex:1;overflow-y:auto;padding:4px}
+.agent-list::-webkit-scrollbar{width:3px}.agent-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.agent-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;margin:2px 0;transition:background .15s}
+.agent-item.active{background:var(--accent-dim)}
+.agent-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.agent-info{flex:1;min-width:0}
+.agent-name{font-size:12px;font-weight:500;color:var(--text)}
+.agent-status{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-progress{width:100%;height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden}
+.agent-progress-bar{height:100%;border-radius:2px;transition:width .3s ease;width:0%}
+
+@media(max-width:768px){.sidebar{display:none}.msg{max-width:100%}.header-stats{display:none}}
 </style>
 </head>
 <body>
+<div id="validateBanner">
+  <div id="validateBannerLabel">Validando modelos...</div>
+  <div id="validateBannerBar"><div id="validateBannerFill"></div></div>
+  <div id="validateBannerDetail">Iniciando...</div>
+  <button id="validateBannerClose" onclick="document.getElementById('validateBanner').classList.remove('show')">✕</button>
+</div>
 <div class="header">
-  <span class="logo">ULTRON</span><div class="pulse"></div>
-  <span style="font-size:11px;color:var(--dim)">command center</span>
-  <select class="model-select" id="modelSelect" onchange="switchModel(this.value)"><option value="">Loading models...</option></select>
-  <span class="header-stats" id="headerStats"></span>
+  <span class="logo">ULTRON</span><div class="status-dot" id="statusDot"></div>
+  <div class="header-right">
+    <span class="header-stats" id="headerStats"><span>0</span> tokens</span>
+    <span class="queue-badge" id="headerStatus" style="font-size:10px;color:var(--dim)"></span>
+    <select class="model-select" id="modelSelect"><option>Loading...</option></select>
+    <button class="send-btn" id="testBtn" onclick="testModels()" style="font-size:11px;padding:0 10px">Test</button>
+  </div>
 </div>
 <div class="main">
   <div class="chat-panel">
-    <div class="messages" id="messages"><div class="msg system">ULTRON v5 — all agents online</div></div>
+    <div class="messages" id="messages"><div class="msg system" id="connectingMsg">Connecting...</div></div>
     <div class="input-wrap">
-      <textarea id="input" placeholder="Type..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
-      <button onclick="send()">Send</button>
+      <textarea id="input" placeholder="Send a message..." rows="1"></textarea>
+      <div class="btn-group">
+        <span class="queue-badge" id="queueBadge">0 en cola</span>
+        <button class="stop-btn" id="stopBtn" onclick="stop()">Stop</button>
+        <button class="send-btn" id="sendBtn" onclick="send()">Send</button>
+      </div>
     </div>
   </div>
-  <div class="world"><canvas id="canvas"></canvas></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-title">Agents</div>
+    <div class="agent-list" id="agentList"></div>
+  </div>
 </div>
 
 <script>
+document.getElementById('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+
 const agents = [
-  { id:'Orchestrator', icon:'◆', color:'#ef4444', room:0, status:'idle', progress:0, log:'', count:0 },
-  { id:'Architect', icon:'◈', color:'#f59e0b', room:1, status:'idle', progress:0, log:'', count:0 },
-  { id:'Editor', icon:'✎', color:'#10b981', room:2, status:'idle', progress:0, log:'', count:0 },
-  { id:'Librarian', icon:'◉', color:'#3b82f6', room:3, status:'idle', progress:0, log:'', count:0 },
-  { id:'Basher', icon:'⬢', color:'#8b5cf6', room:4, status:'idle', progress:0, log:'', count:0 },
-  { id:'Researcher', icon:'◇', color:'#06b6d4', room:5, status:'idle', progress:0, log:'', count:0 },
-  { id:'Thinker', icon:'◎', color:'#f97316', room:6, status:'idle', progress:0, log:'', count:0 },
-  { id:'Reviewer', icon:'○', color:'#ec4899', room:7, status:'idle', progress:0, log:'', count:0 },
+  { id:'Orchestrator', displayName:'Cerebro',     icon:'⬡', color:'#22d3ee' },
+  { id:'Architect',    displayName:'Visión',      icon:'△', color:'#f59e0b' },
+  { id:'Editor',       displayName:'Artífice',    icon:'◇', color:'#4ade80' },
+  { id:'Librarian',    displayName:'Sabio',       icon:'○', color:'#60a5fa' },
+  { id:'Basher',       displayName:'Ejecutor',    icon:'▽', color:'#a78bfa' },
+  { id:'Researcher',   displayName:'Explorador',  icon:'□', color:'#2dd4bf' },
+  { id:'Thinker',      displayName:'Estratega',   icon:'◎', color:'#fb923c' },
+  { id:'Reviewer',     displayName:'Juez',        icon:'☆', color:'#f472b6' },
 ];
 
-let tokens=0,model='',isStreaming=false,streamMsg=null;
-const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
-let w,h;
-let files=[]; // flying files between agents
-let particles=[];
+let tokens=0,model='',isStreaming=false,streamMsg=null,currentController=null;
+const pendingQueue=[];
+
+function renderAgentList(){
+  const list=document.getElementById('agentList');list.innerHTML='';
+  for(const a of agents){
+    const el=document.createElement('div');el.className='agent-item';el.id='agent-'+a.id;
+    el.innerHTML=`
+      <div class="agent-icon" style="background:${a.color}20;color:${a.color}">${a.icon}</div>
+      <div class="agent-info">
+        <div class="agent-name">${a.displayName || a.id}</div>
+        <div class="agent-status" id="status-${a.id}">idle</div>
+        <div class="agent-progress"><div class="agent-progress-bar" id="progress-${a.id}" style="background:${a.color}"></div></div>
+      </div>`;
+    list.appendChild(el);
+  }
+}
+renderAgentList();
 
 async function loadModels(){
   try{
@@ -90,206 +160,172 @@ async function loadModels(){
       sel.appendChild(grp);
     }
     model=d.current;updateStats();
-  }catch(e){console.error('Failed to load models',e)}
+    document.getElementById('connectingMsg').textContent='Ready';
+  }catch(e){document.getElementById('connectingMsg').textContent='Connection error: '+(e.message||'unknown')}
 }
+
 async function switchModel(modelId){
   if(!modelId)return;
-  try{await fetch('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:modelId})});model=modelId;updateStats();}catch(e){console.error(e)}
+  try{const r=await fetch('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:modelId})});const d=await r.json();model=d.current;updateStats()}catch(e){console.error(e)}
 }
+
+document.getElementById('modelSelect').addEventListener('change',e=>switchModel(e.target.value));
 loadModels();
 
-function resize(){w=canvas.parentElement.clientWidth;h=canvas.parentElement.clientHeight;canvas.width=w;canvas.height=h}
-window.addEventListener('resize',resize);resize();
-
-// Building layout - rooms in 2 rows of 4
-function roomBounds(i) {
-  const col=i%4,row=Math.floor(i/4);
-  const rw=w/4.5,rh=h/2.4, gapX=w*0.02, gapY=h*0.05;
-  const ox=w*0.05+col*(rw+gapX),oy=h*0.08+row*(rh+gapY);
-  return {x:ox,y:oy,w:rw,h:rh,cx:ox+rw/2,cy:oy+rh/2};
-}
-
-// Spawn file from agent A to agent B
-function sendFile(from,to) {
-  const a=roomBounds(from),b=roomBounds(to);
-  files.push({
-    x:a.cx,y:a.cy,tx:b.cx,ty:b.cy,progress:0,
-    color:agents[to].color,from,to
-  });
-}
-
-// Particles
-function spawnParticle(x,y,color){for(let i=0;i<2;i++)particles.push({x,y,vx:(Math.random()-.5)*1,vy:(Math.random()-.5)*1-2,life:1,color})}
-
-function render(){
-  ctx.clearRect(0,0,w,h);requestAnimationFrame(render);
-
-  // Background grid
-  ctx.strokeStyle='rgba(255,255,255,.015)';ctx.lineWidth=1;
-  for(let x=0;x<w;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}
-  for(let y=0;y<h;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
-
-  // ROOMS
-  for(let i=0;i<8;i++){
-    const r=roomBounds(i);
-    const a=agents[i];
-    // Room background
-    ctx.fillStyle=a.status==='active'?'rgba(255,255,255,.03)':'rgba(255,255,255,.01)';
-    ctx.strokeStyle=a.status==='active'?a.color+'60':a.color+'20';
-    ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(r.x,r.y,r.w,r.h,8);ctx.fill();ctx.stroke();
-    // Room label
-    ctx.fillStyle='rgba(255,255,255,.1)';ctx.font='8px system-ui';ctx.textAlign='center';
-    // Mini window inside room
-    const mx=r.x+4,my=r.y+r.h-38,mw=r.w-8,mh=34;
-    ctx.fillStyle='rgba(0,0,0,.85)';ctx.beginPath();ctx.roundRect(mx,my,mw,mh,4);ctx.fill();
-    ctx.strokeStyle=a.color+'60';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(mx,my,mw,mh,4);ctx.stroke();
-    // Agent icon + name
-    ctx.fillStyle=a.color;ctx.font='bold 9px system-ui';ctx.textAlign='left';
-    ctx.fillText(a.icon+' '+a.id,mx+5,my+14);
-    // Action log
-    ctx.fillStyle='#8899aa';ctx.font='8px system-ui';
-    const logText=(a.log||'idle').slice(0,25);
-    ctx.fillText(logText,mx+5,my+26);
-    // Progress bar
-    const px=mx+4,py=my+28,pw=mw-8,ph=4;
-    ctx.fillStyle='rgba(255,255,255,.15)';ctx.beginPath();ctx.roundRect(px,py,pw,ph,2);ctx.fill();
-    if(a.progress>0){
-      ctx.fillStyle=a.color;ctx.beginPath();ctx.roundRect(px,py,pw*Math.min(a.progress,100)/100,ph,2);ctx.fill()
+// SSE for validation progress
+const es=new EventSource('/ws');
+es.addEventListener('validate',e=>{
+  try{
+    const d=JSON.parse(e.data);
+    const banner=document.getElementById('validateBanner');
+    const label=document.getElementById('validateBannerLabel');
+    const bar=document.getElementById('validateBannerFill');
+    const detail=document.getElementById('validateBannerDetail');
+    if(d.type==='start'){
+      banner.classList.add('show');
+      label.textContent=d.message||'Validando modelos...';
+      bar.style.width='0%';
+      detail.textContent='0/'+d.total;
+    }else if(d.type==='progress'){
+      const pct=Math.round((d.done/d.total)*100);
+      bar.style.width=pct+'%';
+      detail.textContent=d.model+': '+(d.status==='healthy'?'✓':'✗')+' ('+d.done+'/'+d.total+')';
+    }else if(d.type==='done'){
+      bar.style.width='100%';
+      detail.textContent='✓ '+d.healthy+' accesibles | ✗ '+d.unhealthy+' no accesibles';
+      label.textContent='Modelos validados';
+      setTimeout(()=>banner.classList.remove('show'),5000);
     }
-    // Percentage number
-    if(a.progress>0&&a.progress<100){
-      ctx.fillStyle='#fff';ctx.font='bold 7px system-ui';ctx.textAlign='right';
-      ctx.fillText(Math.round(a.progress)+'%',mx+mw-4,py+3);
-    }
-  }
+  }catch(e){}
+});
 
-  // HALLWAYS (connections between rooms)
-  ctx.strokeStyle='rgba(255,255,255,.03)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-  for(let from=0;from<8;from++){
-    for(let to=0;to<8;to++){
-      if(from===to)continue;
-      const a=roomBounds(from),b=roomBounds(to);
-      ctx.beginPath();ctx.moveTo(a.cx,a.cy);ctx.lineTo(b.cx,b.cy);ctx.stroke();
-    }
-  }
-  ctx.setLineDash([]);
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function safeMD(t){return esc(t).replace(/```(\w+)?\n([\s\S]*?)```/g,'<pre>$2</pre>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>')}
 
-  // PARTICLES
-  particles=particles.filter(p=>p.life>0);
-  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life-=.03;ctx.fillStyle=p.color+Math.floor(p.life*80).toString(16).padStart(2,'0');ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fill()}
-
-  // FLYING FILES
-  files=files.filter(f=>f.progress<1);
-  for(const f of files){
-    f.progress+=.03;
-    const t=Math.min(f.progress,1);
-    const cx=f.x+(f.tx-f.x)*t,cy=f.y+(f.ty-f.y)*t-Math.sin(t*Math.PI)*30;
-    // Glow trail
-    ctx.fillStyle=f.color+'20';ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);ctx.fill();
-    // File icon
-    ctx.fillStyle=f.color;ctx.fillRect(cx-4,cy-5,8,10);
-    ctx.fillStyle='#fff';ctx.fillRect(cx-2,cy-3,4,1);ctx.fillRect(cx-2,cy,4,1);ctx.fillRect(cx-2,cy+3,4,1);
-    // Trail particles
-    if(Math.random()>.5)spawnParticle(cx,cy,f.color);
-    // Arrival notification
-    if(f.progress>=1){agents[f.to].log='received task';agents[f.to].progress=0}
-  }
-
-  // AGENTS (on top of rooms, moving)
-  for(let i=0;i<8;i++){
-    const a=agents[i];
-    const r=roomBounds(i);
-    const ax=r.cx,ay=r.cy-15;
-    // Glow
-    if(a.status==='active'){
-      const g=ctx.createRadialGradient(ax,ay,0,ax,ay,20);
-      g.addColorStop(0,a.color+'30');g.addColorStop(1,'transparent');
-      ctx.fillStyle=g;ctx.beginPath();ctx.arc(ax,ay,20,0,Math.PI*2);ctx.fill()
-    }
-    // Agent body
-    ctx.fillStyle=a.color;ctx.beginPath();ctx.arc(ax,ay,8,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(0,0,0,.4)';ctx.beginPath();ctx.arc(ax,ay,5,0,Math.PI*2);ctx.fill();
-    // Icon
-    ctx.fillStyle=a.color;ctx.font='9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(a.icon,ax,ay+1);
-    // Particles when active
-    if(a.status==='active'&&Math.random()>.6)spawnParticle(ax,ay-8,a.color);
-    // Progress ring
-    if(a.progress>0&&a.progress<100){
-      ctx.strokeStyle=a.color;ctx.lineWidth=2;ctx.beginPath();
-      ctx.arc(ax,ay,12,-Math.PI/2,-Math.PI/2+Math.PI*2*a.progress/100);ctx.stroke()
-    }
-    // Simulate progress
-    if(a.status==='active'){a.progress=Math.min(100,a.progress+Math.random()*5);
-      if(a.progress>=100){a.status='idle';a.log='done ✓';setTimeout(()=>{if(a.log==='done ✓')a.log='idle'},3000)}
-    }
-  }
-}
-render();
-
-// ===== CHAT =====
 function addMessage(text,type){
   const el=document.createElement('div');el.className='msg '+type;
-  el.innerHTML=text.replace(/```(\w+)?\n([\s\S]*?)```/g,'<pre>$2</pre>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>');
+  el.innerHTML=safeMD(text);
   document.getElementById('messages').appendChild(el);el.scrollIntoView(false);return el
 }
-function showTyping(show){
-  const e=document.getElementById('typing');
-  if(show&&!e){const d=document.createElement('div');d.id='typing';d.className='msg ai';d.innerHTML='<span style="animation:blink 1s infinite">.</span><span style="animation:blink 1s .2s infinite">.</span><span style="animation:blink 1s .4s infinite">.</span>';document.getElementById('messages').appendChild(d);d.scrollIntoView(false)}
-  else if(!show&&e)e.remove()
+
+function setAgentStatus(id,status,log){
+  const a=agents.find(x=>x.id===id);if(!a)return;
+  const item=document.getElementById('agent-'+id);
+  const statusEl=document.getElementById('status-'+id);
+  const progressEl=document.getElementById('progress-'+id);
+  if(!item||!statusEl||!progressEl)return;
+  item.className='agent-item'+(status==='active'?' active':'');
+  statusEl.textContent=log||status;
+  if(status==='active'){progressEl.style.width='60%'}else if(status==='done'){progressEl.style.width='100%';setTimeout(()=>{progressEl.style.width='0%';statusEl.textContent='idle'},2000)}else{progressEl.style.width='0%'}
 }
+
+let streamRawText='';
+
+function stop(){
+  if(currentController){currentController.abort();currentController=null;currentController=undefined}
+}
+
+function updateQueueBadge(){
+  const badge=document.getElementById('queueBadge');
+  if(pendingQueue.length>0){badge.style.display='inline';badge.textContent=pendingQueue.length+' en cola'}
+  else{badge.style.display='none'}
+}
+
 async function send(){
-  const input=document.getElementById('input');const text=input.value.trim();if(!text||isStreaming)return;
-  input.value='';addMessage(text,'user');showTyping(true);isStreaming=true;
-  let lastAgent=null;
-
-  try{
-    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,model:model})});
-    const reader=r.body.getReader();const decoder=new TextDecoder();
-    let leftover='';
-
-    while(true){
-      const{done,value}=await reader.read();if(done)break;
-      leftover+=decoder.decode(value,{stream:true});
-      const lines=leftover.split('\n');leftover=lines.pop()||'';
-
-      for(const line of lines){
-        if(!line.trim())continue;
-        try{
-          const d=JSON.parse(line);
-
-          if(d.type==='init'){model=d.model;updateStats()}
-          else if(d.type==='stream'){
-            if(!streamMsg){streamMsg=addMessage('','ai');showTyping(false)}
-            streamMsg.innerHTML+=d.content.replace(/\n/g,'<br>');streamMsg.scrollIntoView(false);
-            for(const a of agents){a.status='idle';a.progress=0;if(!a.log.includes('✓'))a.log='idle'}
-            lastAgent=null;
-          }
-          else if(d.type==='event'&&d.data){
-            const ev=d.data;
-            if(ev.type==='action'){
-              const a=agents.find(x=>x.id===ev.agent);
-              if(a){a.status='active';a.log=ev.message.slice(0,30);a.count++;a.progress=0;
-                if(lastAgent!==null&&lastAgent!==agents.indexOf(a))sendFile(lastAgent,agents.indexOf(a));
-                lastAgent=agents.indexOf(a);
-              }
-            }else if(ev.type==='done'){
-              const a=agents.find(x=>x.id===ev.agent);
-              if(a){a.status='idle';a.log='completed ✓';a.progress=100}
-            }else if(ev.type==='thought'){
-              const a=agents.find(x=>x.id===ev.agent);
-              if(a)a.status='active';
-            }
-          }
-          else if(d.type==='result'){tokens=d.tokens?.tokens||0;updateStats();streamMsg=null}
-        }catch(e){}
-      }
-    }
-  }catch(e){showTyping(false);addMessage('Error: '+e.message,'ai')}
-  isStreaming=false;updateStats()
+  const input=document.getElementById('input');const text=input.value.trim();if(!text)return;
+  input.value='';
+  if(isStreaming){
+    pendingQueue.push(text);addMessage(text,'user');
+    addMessage('(encolado — se procesará cuando termine el actual)','system');
+    updateQueueBadge();return
+  }
+  isStreaming=true;document.getElementById('sendBtn').disabled=true;document.getElementById('stopBtn').style.display='inline';
+  addMessage(text,'user');showTyping(true);
+  await doSend(text);
 }
-function updateStats(){document.getElementById('headerStats').innerHTML=`<span>${model||'?'}</span> · tokens <span>${tokens.toLocaleString()}</span>`}
-resize();document.getElementById('input').focus();
+
+async function doSend(text){
+  const controller=new AbortController();currentController=controller;streamRawText='';
+  const tm=setTimeout(()=>controller.abort(),180000);
+  try{
+    const resp=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,model:model}),signal:controller.signal});clearTimeout(tm);
+    if(!resp.ok){showTyping(false);addMessage('Error: HTTP '+resp.status,'ai');finishSend();return}
+    if(controller.signal.aborted){finishSend();return}
+    const reader=resp.body.getReader();const decoder=new TextDecoder();
+    let leftover='',firstChunk=true;
+    try{
+      while(true){
+        const{done,value}=await reader.read();if(done)break;
+        if(controller.signal.aborted){reader.cancel();break}
+        leftover+=decoder.decode(value,{stream:true});
+        const lines=leftover.split('\n');leftover=lines.pop()||'';
+        for(const line of lines){
+          if(!line.trim())continue;
+          try{
+            const d=JSON.parse(line);
+            if(d.type==='init'){model=d.model;document.getElementById('statusDot').style.background='var(--success)';updateStats()}
+            else if(d.type==='stream'){
+              if(!streamMsg){streamMsg=addMessage('','ai');showTyping(false);firstChunk=true}
+              if(firstChunk){streamRawText=d.content||'';firstChunk=false}else{streamRawText+=d.content||''}
+              streamMsg.textContent=streamRawText;streamMsg.scrollIntoView(false);
+            }
+            else if(d.type==='event'&&d.data){
+              const ev=d.data;
+              if(ev.type==='action'){setAgentStatus(ev.agent,'active',ev.message.slice(0,40))}
+              else if(ev.type==='done'){setAgentStatus(ev.agent,'done','completed')}
+              else if(ev.type==='thought'){setAgentStatus(ev.agent,'active','thinking...')}
+            }
+            else if(d.type==='result'){
+              if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);
+              tokens=d.tokens?.tokens||0;updateStats();streamMsg=null;streamRawText='';
+            }
+            else if(d.type==='error'){showTyping(false);addMessage('Error: '+d.error,'ai')}
+          }catch(e){}
+        }
+      }
+      if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);
+    }catch(e){
+      if(controller.signal.aborted){addMessage('⏹ Detenido','system')}
+      else{showTyping(false);addMessage('Error: '+(e.message||'Connection lost'),'ai')}
+    }
+  }catch(e){
+    clearTimeout(tm);
+    if(controller.signal.aborted){showTyping(false);addMessage('⏹ Detenido','system')}
+    else{showTyping(false);addMessage('Error: '+(e.message||'Failed to fetch'),'ai')}
+  }
+  currentController=null;finishSend();
+}
+
+function finishSend(){
+  isStreaming=false;document.getElementById('sendBtn').disabled=false;document.getElementById('stopBtn').style.display='none';updateStats();
+  if(!currentController&&pendingQueue.length>0){
+    const next=pendingQueue.shift();
+    updateQueueBadge();
+    addMessage('Procesando siguiente mensaje...','system');
+    isStreaming=true;document.getElementById('sendBtn').disabled=true;document.getElementById('stopBtn').style.display='inline';showTyping(true);
+    doSend(next)
+  }
+}
+
+function showTyping(show){
+  const existing=document.getElementById('typing');
+  if(show&&!existing){
+    const d=document.createElement('div');d.id='typing';d.className='msg ai';
+    d.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>';
+    document.getElementById('messages').appendChild(d);d.scrollIntoView(false)
+  }else if(!show&&existing){existing.remove()}
+}
+
+async function testModels(){
+  const btn=document.getElementById('testBtn');btn.disabled=true;btn.textContent='...';
+  document.getElementById('headerStatus').textContent='Testing models...';
+  const input=document.getElementById('input');const was=input.value;
+  input.value='/test-models';document.getElementById('sendBtn').click();
+  input.value=was;btn.disabled=false;btn.textContent='Test';
+  setTimeout(()=>document.getElementById('headerStatus').textContent='',5000)
+}
+function updateStats(){document.getElementById('headerStats').innerHTML=`<span>${tokens.toLocaleString()}</span> tokens<span>${model||'?'}</span>`}
+document.getElementById('input').focus();
 </script>
 </body>
 </html>

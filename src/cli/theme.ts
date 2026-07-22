@@ -1,5 +1,5 @@
 // src/cli/theme.ts
-// Sistema de temas visuales para J.A.R.V.I.S.
+// Professional color themes — clean, readable, modern
 
 export interface ThemeColors {
   primary: string; accent: string; success: string; warn: string;
@@ -11,33 +11,33 @@ export type ThemeName = 'ultron' | 'sky' | 'cyber' | 'midnight' | 'matrix';
 
 export const themes: Record<string, ThemeColors> = {
   ultron: {
-    primary: '#ef4444', accent: '#f87171', success: '#34d399',
-    warn: '#fbbf24', error: '#dc2626', dim: '#3d1a1a',
-    surface: '#1a0a0a', text: '#fca5a5', bright: '#fecaca',
-    bg: '#0a0202', matrix: '#2d0a0a',
+    primary: '#22d3ee', accent: '#67e8f9', success: '#4ade80',
+    warn: '#fbbf24', error: '#f87171', dim: '#64748b',
+    surface: '#1e293b', text: '#e2e8f0', bright: '#f8fafc',
+    bg: '#0f172a', matrix: '#155e75',
   },
   sky: {
-    primary: '#0ea5e9', accent: '#38bdf8', success: '#34d399',
-    warn: '#fbbf24', error: '#f87171', dim: '#1e3a5f',
-    surface: '#0c1929', text: '#7dd3fc', bright: '#e0f2fe',
-    bg: '#061220', matrix: '#0a1e3d',
+    primary: '#60a5fa', accent: '#93c5fd', success: '#4ade80',
+    warn: '#fbbf24', error: '#f87171', dim: '#64748b',
+    surface: '#1e293b', text: '#e2e8f0', bright: '#f8fafc',
+    bg: '#0f172a', matrix: '#1e3a5f',
   },
   cyber: {
-    primary: '#00ffff', accent: '#ff00ff', success: '#00ff88',
-    warn: '#ffff00', error: '#ff0055', dim: '#1a2a3a',
-    surface: '#0a0a1a', text: '#00ddff', bright: '#00ffff',
-    bg: '#010118', matrix: '#001133',
+    primary: '#2dd4bf', accent: '#5eead4', success: '#34d399',
+    warn: '#facc15', error: '#fb7185', dim: '#64748b',
+    surface: '#1e293b', text: '#e2e8f0', bright: '#f8fafc',
+    bg: '#0f172a', matrix: '#0d9488',
   },
   midnight: {
-    primary: '#6366f1', accent: '#a855f7', success: '#22c55e',
-    warn: '#eab308', error: '#ef4444', dim: '#334155',
-    surface: '#0f172a', text: '#cbd5e1', bright: '#f1f5f9',
-    bg: '#020617', matrix: '#1e1b4b',
+    primary: '#a78bfa', accent: '#c4b5fd', success: '#4ade80',
+    warn: '#fbbf24', error: '#f87171', dim: '#64748b',
+    surface: '#1e293b', text: '#e2e8f0', bright: '#f8fafc',
+    bg: '#0f172a', matrix: '#5b21b6',
   },
   matrix: {
-    primary: '#00ff41', accent: '#00cc33', success: '#39ff14',
-    warn: '#bfff00', error: '#ff0040', dim: '#1a3a1a',
-    surface: '#0d1f0d', text: '#00cc33', bright: '#00ff41',
+    primary: '#4ade80', accent: '#86efac', success: '#22c55e',
+    warn: '#facc15', error: '#f87171', dim: '#4a7a5a',
+    surface: '#0a1a0a', text: '#bbf7d0', bright: '#f0fdf4',
     bg: '#020502', matrix: '#003b00',
   },
 };

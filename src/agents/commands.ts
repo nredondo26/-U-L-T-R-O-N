@@ -62,6 +62,9 @@ export async function handleCommand(
       const h = getHealthSummary();
       return { response: `Health: ${h.healthy} healthy, ${h.unhealthy} down de ${h.total} total\nUltimo check: ${h.lastCheck || 'nunca'}` };
     }
+    case 'test-models': case 'testmodels': {
+      return { response: 'Testing todos los modelos...', action: { type: 'testModels', command: args, cwd: projectDir } };
+    }
     case 'graph': {
       return { response: `Grafo de conocimiento:\n${vault.getGraph().nodes.length} nodos, ${vault.getGraph().edges.length} conexiones\nUsa /vault para ver notas.` };
     }
@@ -244,6 +247,7 @@ function helpText(): string {
   /history         - Historial reciente
   /model <id>      - Cambiar modelo de IA
   /models          - Listar todos los modelos disponibles
+  /test-models     - Testear todos los modelos y mostrar solo accesibles
   /health          - Estado de salud de los modelos
   /stats /tokens   - Estadisticas de uso
   /vault           - Notas en vault

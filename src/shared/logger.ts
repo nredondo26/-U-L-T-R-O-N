@@ -4,11 +4,33 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as zlib from 'zlib';
 
 const logDir = path.join(os.homedir(), '.jarvis', 'logs');
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
 
+const MAX_LOG_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_LOG_AGE_DAYS = 7;
+
+function rotateLogs(): void {
+  try {
+    const now = Date.now();
+    for (const f of fs.readdirSync(logDir)) {
+      const fp = path.join(logDir, f);
+      const stat = fs.statSync(fp);
+      if (stat.size > MAX_LOG_SIZE || (now - stat.mtimeMs) > MAX_LOG_AGE_DAYS * 86400000) {
+        if (f.endsWith('.gz')) { fs.unlinkSync(fp); continue; }
+        const gzPath = fp + '.gz';
+        const content = fs.readFileSync(fp);
+        fs.writeFileSync(gzPath, zlib.gzipSync(content));
+        fs.unlinkSync(fp);
+      }
+    }
+  } catch {}
+}
+
 const logFile = path.join(logDir, `jarvis-${new Date().toISOString().slice(0, 10)}.log`);
+rotateLogs();
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 const LOG_LEVELS: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };

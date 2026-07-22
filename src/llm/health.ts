@@ -18,8 +18,16 @@ interface HealthData {
 
 let healthData: HealthData = { lastCheck: null, models: {} };
 let healthLoaded = false;
+let healthFilePath: string | null = null;
 
-const healthFile = path.join(process.cwd(), 'vault', 'model-health.json');
+function getHealthFile(): string {
+  return healthFilePath || path.join(process.cwd(), 'vault', 'model-health.json');
+}
+
+export function setHealthFile(filePath: string): void {
+  healthFilePath = filePath;
+  healthLoaded = false;
+}
 const PING_MESSAGE = 'hi';
 const TIMEOUT_MS = 10000;
 const BATCH_SIZE = 5;
@@ -29,19 +37,21 @@ function loadHealth(): void {
   if (healthLoaded) return;
   healthLoaded = true;
   try {
-    const dir = path.dirname(healthFile);
+    const hf = getHealthFile();
+    const dir = path.dirname(hf);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    if (fs.existsSync(healthFile)) {
-      healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+    if (fs.existsSync(hf)) {
+      healthData = JSON.parse(fs.readFileSync(hf, 'utf8'));
     }
   } catch {}
 }
 
 function saveHealth(): void {
   try {
-    const dir = path.dirname(healthFile);
+    const hf = getHealthFile();
+    const dir = path.dirname(hf);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(healthFile, JSON.stringify(healthData, null, 2), 'utf8');
+    fs.writeFileSync(hf, JSON.stringify(healthData, null, 2), 'utf8');
   } catch {}
 }
 

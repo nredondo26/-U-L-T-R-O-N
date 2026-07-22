@@ -30,8 +30,9 @@ export class LibrarianAgent extends BaseAgent {
   constructor(projectDir: string) {
     const config: AgentConfig = {
       name: 'Librarian',
+      displayName: 'Sabio',
       description: 'Analiza y comprende el codebase. Responde preguntas sobre arquitectura, dependencias y estructura.',
-      systemPrompt: `Eres el Librarian de J.A.R.V.I.S., especializado en comprender codebases.
+      systemPrompt: `Eres Sabio (Librarian) de J.A.R.V.I.S., especializado en comprender codebases.
 
 CAPACIDADES:
 - Navegar la estructura de archivos del proyecto
@@ -80,10 +81,9 @@ REGLAS:
         );
         let filtered = files;
         if (args.pattern) {
-          const regex = new RegExp(
-            (args.pattern as string).replace(/\*/g, '.*').replace(/\?/g, '.'),
-            'i',
-          );
+          const raw = (args.pattern as string).slice(0, 100);
+          const sanitized = raw.replace(/[.+*?^$()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+          const regex = new RegExp(sanitized, 'i');
           filtered = files.filter(f => regex.test(f));
         }
         return filtered.join('\n') || '(vacio)';

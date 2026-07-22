@@ -9,7 +9,9 @@ export function ensureDir(dir: string): void {
 export function loadJSON<T>(file: string, fallback: T): T {
   try {
     if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {}
+  } catch (e) {
+    console.warn(`[utils] loadJSON failed for ${file}:`, e instanceof Error ? e.message : e);
+  }
   return fallback;
 }
 
@@ -17,7 +19,9 @@ export function saveJSON(file: string, data: unknown): void {
   try {
     ensureDir(path.dirname(file));
     fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
-  } catch {}
+  } catch (e) {
+    console.warn(`[utils] saveJSON failed for ${file}:`, e instanceof Error ? e.message : e);
+  }
 }
 
 export function sanitizeFilename(name: string): string {
@@ -48,7 +52,9 @@ export function loadEnv(envPath?: string): void {
           }
         });
       }
-    } catch {}
+    } catch (e) {
+      console.warn(`[utils] loadEnv failed for ${p}:`, e instanceof Error ? e.message : e);
+    }
   }
 }
 

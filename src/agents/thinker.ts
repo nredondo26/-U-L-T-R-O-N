@@ -8,8 +8,9 @@ export class ThinkerAgent extends BaseAgent {
   constructor() {
     const config: AgentConfig = {
       name: 'Thinker',
+      displayName: 'Estratega',
       description: 'Planifica tareas complejas descomponiendolas en pasos ejecutables.',
-      systemPrompt: `Eres el Thinker de J.A.R.V.I.S., especializado en planificar y descomponer tareas complejas.
+      systemPrompt: `Eres Estratega (Thinker) de J.A.R.V.I.S., especializado en planificar y descomponer tareas complejas.
 
 CAPACIDADES:
 - Analizar requerimientos del usuario

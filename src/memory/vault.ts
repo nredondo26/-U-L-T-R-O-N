@@ -5,6 +5,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { VaultNote, VaultGraph } from '../shared/types';
 import { ensureDir, sanitizeFilename } from '../shared/utils';
+import { log } from '../shared/logger';
+
+const MAX_NOTES = 1000;
+const MAX_CONTEXT_NOTES = 50;
+const AUTO_CLEANUP_DAYS = 30;
 
 export class ObsidianVault {
   private vaultDir: string;
@@ -12,6 +17,34 @@ export class ObsidianVault {
   constructor(vaultDir: string) {
     this.vaultDir = vaultDir;
     ensureDir(vaultDir);
+    this.cleanup();
+  }
+
+  private cleanup(): void {
+    try {
+      let notes = this.listNotes();
+      if (notes.length <= MAX_NOTES) return;
+      // Remove old auto-generated notes first
+      const now = Date.now();
+      for (const n of notes) {
+        if (n.name.startsWith('accion_') || n.name.startsWith('contexto_') || n.name.startsWith('nota_')) {
+          const age = now - fs.statSync(path.join(this.vaultDir, n.name + '.md')).mtimeMs;
+          if (age > AUTO_CLEANUP_DAYS * 86400000) this.deleteNote(n.name);
+        }
+      }
+      // Hard cap: remove oldest notes until under limit
+      notes = this.listNotes();
+      if (notes.length > MAX_NOTES) {
+        const sorted = [...notes].sort((a, b) => {
+          const aMtime = fs.statSync(path.join(this.vaultDir, a.name + '.md')).mtimeMs;
+          const bMtime = fs.statSync(path.join(this.vaultDir, b.name + '.md')).mtimeMs;
+          return aMtime - bMtime;
+        });
+        for (const n of sorted.slice(0, notes.length - MAX_NOTES)) this.deleteNote(n.name);
+      }
+    } catch (e) {
+      log.warn('vault cleanup error', { error: e instanceof Error ? e.message : String(e) });
+    }
   }
 
   listNotes(): VaultNote[] {
@@ -106,9 +139,11 @@ export class ObsidianVault {
   }
 
   buildContext(): string {
-    const notes = this.listNotes();
-    if (notes.length === 0) return '(vault vacio)';
-    return notes
+    const allNotes = this.listNotes();
+    if (allNotes.length === 0) return '(vault vacio)';
+    const notes = allNotes.sort(() => Math.random() - 0.5).slice(0, MAX_CONTEXT_NOTES);
+    const header = notes.length < allNotes.length ? `[mostrando ${notes.length} de ${allNotes.length} notas]\n` : '';
+    return header + notes
       .map(n => `- ${n.name}: ${n.excerpt} [links: ${n.links.join(', ') || 'ninguno'}] [tags: ${n.tags.join(', ') || 'ninguno'}]`)
       .join('\n');
   }

@@ -12,8 +12,9 @@ export class BasherAgent extends BaseAgent {
   constructor(projectDir: string) {
     const config: AgentConfig = {
       name: 'Basher',
+      displayName: 'Ejecutor',
       description: 'Ejecuta comandos de terminal, git, npm, etc.',
-      systemPrompt: `Eres el Basher de J.A.R.V.I.S., especializado en ejecutar comandos del sistema.
+      systemPrompt: `Eres Ejecutor (Basher) de J.A.R.V.I.S., especializado en ejecutar comandos del sistema.
 
 CAPACIDADES:
 - Ejecutar comandos de terminal (npm, git, node, python, etc.)

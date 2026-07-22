@@ -5,9 +5,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ensureDir } from '../shared/utils';
 
-export function readFile(filePath: string, projectDir: string): string {
+function safeResolve(projectDir: string, filePath: string): string {
   const resolved = path.resolve(projectDir, filePath);
+  if (!resolved.startsWith(path.resolve(projectDir))) {
+    throw new Error(`Acceso denegado: ${filePath} esta fuera del directorio del proyecto`);
+  }
+  return resolved;
+}
+
+export function readFile(filePath: string, projectDir: string): string {
+  const resolved = safeResolve(projectDir, filePath);
   if (!fs.existsSync(resolved)) throw new Error(`Archivo no encontrado: ${filePath}`);
+  const stat = fs.statSync(resolved);
+  if (stat.size > 10 * 1024 * 1024) throw new Error(`Archivo demasiado grande: ${(stat.size / 1024 / 1024).toFixed(1)}MB (max 10MB)`);
   return fs.readFileSync(resolved, 'utf8');
 }
 
@@ -18,14 +28,15 @@ export function readFileRange(filePath: string, start: number, end: number, proj
 }
 
 export function writeFile(filePath: string, content: string, projectDir: string): string {
-  const resolved = path.resolve(projectDir, filePath);
+  const resolved = safeResolve(projectDir, filePath);
   ensureDir(path.dirname(resolved));
+  if (content.length > 10 * 1024 * 1024) throw new Error(`Contenido demasiado grande: ${(content.length / 1024 / 1024).toFixed(1)}MB (max 10MB)`);
   fs.writeFileSync(resolved, content, 'utf8');
   return resolved;
 }
 
 export function listFiles(dir: string, projectDir: string, maxDepth = 4): string[] {
-  const resolved = path.resolve(projectDir, dir);
+  const resolved = safeResolve(projectDir, dir);
   const files: string[] = [];
   const scan = (d: string, depth: number): void => {
     if (depth > maxDepth) return;
@@ -46,7 +57,7 @@ export function listFiles(dir: string, projectDir: string, maxDepth = 4): string
 }
 
 export function deleteFile(filePath: string, projectDir: string): boolean {
-  const resolved = path.resolve(projectDir, filePath);
+  const resolved = safeResolve(projectDir, filePath);
   if (fs.existsSync(resolved)) {
     fs.unlinkSync(resolved);
     return true;
@@ -67,7 +78,6 @@ export function searchInFiles(query: string, projectDir: string, filePattern?: s
     files = files.filter(f => regex.test(f));
   }
 
-  // Only search text files
   const textExts = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.txt', '.html', '.css', '.py', '.kt', '.java', '.rs', '.go', '.yml', '.yaml', '.toml', '.env', '.gitignore'];
   files = files.filter(f => textExts.includes(path.extname(f)) || !path.extname(f));
 

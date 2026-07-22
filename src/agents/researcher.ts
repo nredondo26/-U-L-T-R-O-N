@@ -9,8 +9,9 @@ export class ResearcherAgent extends BaseAgent {
   constructor() {
     const config: AgentConfig = {
       name: 'Researcher',
+      displayName: 'Explorador',
       description: 'Busca informacion en la web: documentacion, tutoriales, APIs, noticias.',
-      systemPrompt: `Eres el Researcher de J.A.R.V.I.S., especializado en busqueda web.
+      systemPrompt: `Eres Explorador (Researcher) de J.A.R.V.I.S., especializado en busqueda web.
 
 CAPACIDADES:
 - Buscar en la web (DuckDuckGo)

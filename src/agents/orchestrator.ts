@@ -1,9 +1,10 @@
 // src/agents/orchestrator.ts - v3: conversacion limpia, sin tool_calls en historial
+import * as path from 'path';
 import type { ChatMessage, ToolDefinition } from '../shared/types';
 import type { AgentEvent, OrchestratorConfig } from './types';
 import { chatCompletion } from '../llm/chat';
 import { getProviders, getAllModels, getHealthyModelList } from '../llm/providers';
-import { isModelHealthy } from '../llm/health';
+import { isModelHealthy, setHealthFile } from '../llm/health';
 import { ConfigStore } from '../shared/config';
 import { ObsidianVault } from '../memory/vault';
 import { SessionMemory } from '../memory/session';
@@ -21,19 +22,18 @@ import { handleCommand, isSlashCommand } from './commands';
 import * as fileTools from '../tools/file';
 import { executeCommand } from '../tools/execute';
 import { sandboxedExec, getSandboxConfig, setSandboxMode, allowAll, addAllow } from '../tools/sandbox';
-import { loadSkills } from '../tools/skills';
 import { log } from '../shared/logger';
 
 const SUMMARIZE_EVERY = 12;
 
 function toolLabel(name: string, args: Record<string, unknown>): string {
   switch (name) {
-    case 'delegate_editor': return `editando`;
-    case 'delegate_librarian': return `analizando codebase`;
-    case 'delegate_basher': return `ejecutando`;
-    case 'delegate_researcher': return `buscando web`;
-    case 'delegate_thinker': return `planificando`;
-    case 'delegate_reviewer': return `revisando`;
+    case 'delegate_editor': return `editando (Artífice)`;
+    case 'delegate_librarian': return `analizando codebase (Sabio)`;
+    case 'delegate_basher': return `ejecutando (Ejecutor)`;
+    case 'delegate_researcher': return `buscando web (Explorador)`;
+    case 'delegate_thinker': return `planificando (Estratega)`;
+    case 'delegate_reviewer': return `revisando (Juez)`;
     case 'read_file': return `leyendo ${(args.filePath as string || '').split('/').pop()}`;
     case 'write_file': return `escribiendo ${(args.filePath as string || '').split('/').pop()}`;
     case 'str_replace': return `editando ${(args.filePath as string || '').split('/').pop()}`;
@@ -41,6 +41,21 @@ function toolLabel(name: string, args: Record<string, unknown>): string {
     case 'direct_execute': return (args.command as string || '').slice(0, 30);
     default: return name.replace('delegate_', '').replace('direct_', '');
   }
+}
+
+const DISPLAY_NAMES: Record<string, string> = {
+  Orchestrator: 'Cerebro',
+  Architect: 'Visión',
+  Editor: 'Artífice',
+  Librarian: 'Sabio',
+  Basher: 'Ejecutor',
+  Researcher: 'Explorador',
+  Thinker: 'Estratega',
+  Reviewer: 'Juez',
+};
+
+function displayName(name: string): string {
+  return DISPLAY_NAMES[name] || name;
 }
 
 function agentForTool(name: string): string {
@@ -72,6 +87,7 @@ export class Orchestrator {
   constructor(config: OrchestratorConfig) {
     this.config = config;
     this.vault = new ObsidianVault(config.vaultDir);
+    setHealthFile(path.join(config.vaultDir, 'model-health.json'));
     this.session = new SessionMemory({ maxEvents: 500 });
     this.configStore = new ConfigStore(config.vaultDir);
     this.editor = new EditorAgent(config.projectDir);
@@ -93,12 +109,20 @@ export class Orchestrator {
       .slice(-6);
 
     this.vaultInit();
-    loadSkills();
     log.info('Orchestrator initialized', { model: this.currentModel, projectDir: config.projectDir, historyMsgs: this.conversation.length });
   }
 
+  private lastListenerId = 0;
+  private listeners: Map<string, { onEvent: (event: AgentEvent) => void; onStream: (text: string) => void }> = new Map();
+
   setEventEmitter(cb: (event: AgentEvent) => void): void { this.onEvent = cb; }
   setStreamCallback(cb: (text: string) => void): void { this.onStream = cb; }
+  addListener(l: { onEvent: (event: AgentEvent) => void; onStream: (text: string) => void }): string {
+    const id = `L${++this.lastListenerId}`;
+    this.listeners.set(id, l);
+    return id;
+  }
+  removeListener(id: string): void { this.listeners.delete(id); }
   getCurrentModel(): string { return this.currentModel; }
   setCurrentModel(modelId: string): boolean {
     if (getAllModels().some(m => m.model === modelId)) {
@@ -106,8 +130,14 @@ export class Orchestrator {
     } return false;
   }
   getStats() { return this.configStore.stats; }
-  private emit(e: AgentEvent): void { this.onEvent?.(e); }
-  private stream(t: string): void { this.onStream?.(t); }
+  private emit(e: AgentEvent): void {
+    this.onEvent?.(e);
+    for (const l of this.listeners.values()) l.onEvent(e);
+  }
+  private stream(t: string): void {
+    this.onStream?.(t);
+    for (const l of this.listeners.values()) l.onStream(t);
+  }
 
   private vaultInit(): void {
     if (!this.vault.readNote('capacidades_ultron'))
@@ -137,33 +167,53 @@ export class Orchestrator {
         if (type === 'say') { const { speak } = await import('../tools/voice'); return speak(command); }
         if (type === 'index') { const g = await this.graphLearner.indexProject(); return `${g.nodes} nodos, ${g.files} archivos.`; }
         if (type === 'cd') { this.config.projectDir = command; return `Workspace: ${command}`; }
+        if (type === 'testModels') {
+          const { testAllModels } = await import('./model-tester');
+          this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: 'Testeando modelos...', data: {} });
+          testAllModels(this.currentModel, (result) => {
+            this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: `${result.model.split('/').pop()}: ${result.ok ? '✓' : '✗'} (${result.ms}ms)`, data: result });
+          }).then(summary => {
+            this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: summary.slice(0, 120), data: { done: true } });
+            this.emit({ type: 'done', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
+          }).catch(() => {});
+          return 'Testeando modelos... Los resultados se mostrarán en el panel de Agentes.';
+        }
         const out = await sandboxedExec(command, cwd);
         return r.response + '\n\n' + out.slice(0, 2000);
       }
       return r.response;
     }
 
-    this.emit({ type: 'thought', agent: 'Orchestrator', message: '' });
+    this.emit({ type: 'thought', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
 
     const sp = buildSystemPrompt(this.vault, this.session, this.configStore, this.config.projectDir, '').slice(0, 5000);
+    this.stream('');
     const msgs: ChatMessage[] = [{ role: 'system', content: sp }, ...this.conversation.slice(-6), { role: 'user', content: input }];
     const tools = this.getTools();
     let out = ''; let t = 0;
 
     while (t < this.config.maxSteps) {
       t++;
-      const resp = await chatCompletion(
-        { model: this.currentModel, messages: msgs, tools, tool_choice: 'auto', temperature: 0.7 },
-        c => { if (c.content) this.stream(c.content); },
-        ev => { this.currentModel = ev.to; },
-      );
-      if (resp.usage) this.configStore.addTokens(resp.usage.prompt_tokens, resp.usage.completion_tokens);
+      try {
+        const resp = await chatCompletion(
+          { model: this.currentModel, messages: msgs, tools, tool_choice: 'auto', temperature: 0.7 },
+          c => { if (c.content) this.stream(c.content); },
+          ev => { this.currentModel = ev.to; },
+        );
+        if (resp.usage) this.configStore.addTokens(resp.usage.prompt_tokens, resp.usage.completion_tokens);
 
-      if (resp.tool_calls?.length) {
-        msgs.push({ role: 'assistant', content: resp.content, tool_calls: resp.tool_calls });
-        const results = await executeToolsParallel(resp.tool_calls, (n, a) => this.runTool(n, a));
-        for (const r of results) msgs.push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
-      } else { out = resp.content || 'OK'; break; }
+        if (resp.tool_calls?.length) {
+          msgs.push({ role: 'assistant', content: resp.content, tool_calls: resp.tool_calls });
+          const results = await executeToolsParallel(resp.tool_calls, (n, a) => this.runTool(n, a));
+          for (const r of results) msgs.push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+        } else { out = resp.content || 'OK'; break; }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.currentModel = getProviders()[0]?.defaultModel || 'deepseek-chat';
+        this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: `Error: ${msg}`, data: { error: msg } });
+        out = `[Error] ${msg}`;
+        break;
+      }
     }
 
     if (!out) out = 'Max steps.';
@@ -178,15 +228,15 @@ export class Orchestrator {
     this.session.record('chat', input.slice(0, 100), out.slice(0, 200));
     if (this.configStore.turnCount > 0 && this.configStore.turnCount % SUMMARIZE_EVERY === 0) this.autoSummary();
 
-    this.emit({ type: 'done', agent: 'Orchestrator', message: '' });
+    this.emit({ type: 'done', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
     return out;
   }
 
   private preprocess(input: string): string {
     const files: string[] = [];
-    const re = /@(\w+(?:\.\w+)?)/g; let m;
+    const re = /@([\w./\\-]+(?:\.[a-zA-Z0-9]+)?)/g; let m;
     while ((m = re.exec(input)) !== null) {
-      if (!['Editor','Librarian','Basher','Researcher','Thinker','Reviewer'].includes(m[1])) files.push(m[1]);
+      if (!['Editor','Librarian','Basher','Researcher','Thinker','Reviewer','Cerebro','Visión','Artífice','Sabio','Ejecutor','Explorador','Estratega','Juez'].includes(m[1])) files.push(m[1]);
     }
     let msg = input;
     for (const f of files) {
@@ -196,7 +246,8 @@ export class Orchestrator {
   }
 
   private async runTool(name: string, args: Record<string, unknown>): Promise<{ result: string; retries: number }> {
-    this.emit({ type: 'action', agent: agentForTool(name), message: toolLabel(name, args), data: args });
+    const toolAgent = agentForTool(name);
+    this.emit({ type: 'action', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args), data: args });
     log.tool(name, args, 'executing');
     const { result, retries } = await executeTool(name, args, this.config.projectDir, this.editor, this.librarian, this.basher, this.researcher, this.thinker, this.reviewer, this.architect);
     if (name === 'vault_save') this.vault.writeNote(args.name as string, args.content as string);
@@ -218,13 +269,13 @@ export class Orchestrator {
     const d = (name: string, desc: string, props: Record<string, unknown> = {}, required: string[] = []): ToolDefinition =>
       ({ type: 'function', function: { name, description: desc, parameters: { type: 'object', properties: props, required } } });
     return [
-      d('delegate_editor', 'Editor: lee/modifica archivos', { task: { type: 'string' } }, ['task']),
-      d('delegate_librarian', 'Librarian: analiza codebase', { task: { type: 'string' } }, ['task']),
-      d('delegate_basher', 'Basher: ejecuta comandos', { task: { type: 'string' } }, ['task']),
-      d('delegate_researcher', 'Researcher: busca en web', { task: { type: 'string' } }, ['task']),
-      d('delegate_thinker', 'Thinker: planifica tareas', { task: { type: 'string' } }, ['task']),
-      d('delegate_reviewer', 'Reviewer: revisa codigo', { content: { type: 'string' }, context: { type: 'string' } }, ['content']),
-      d('delegate_architect', 'Architect: planifica proyectos grandes con fases y pasos', { task: { type: 'string' } }, ['task']),
+      d('delegate_editor', 'Artífice: lee/modifica archivos', { task: { type: 'string' } }, ['task']),
+      d('delegate_librarian', 'Sabio: analiza codebase', { task: { type: 'string' } }, ['task']),
+      d('delegate_basher', 'Ejecutor: ejecuta comandos', { task: { type: 'string' } }, ['task']),
+      d('delegate_researcher', 'Explorador: busca en web', { task: { type: 'string' } }, ['task']),
+      d('delegate_thinker', 'Estratega: planifica tareas', { task: { type: 'string' } }, ['task']),
+      d('delegate_reviewer', 'Juez: revisa codigo', { content: { type: 'string' }, context: { type: 'string' } }, ['content']),
+      d('delegate_architect', 'Visión: planifica proyectos grandes con fases y pasos', { task: { type: 'string' } }, ['task']),
       d('vault_save', 'Guarda nota en vault', { name: { type: 'string' }, content: { type: 'string' } }, ['name', 'content']),
       d('direct_execute', 'Ejecuta comando', { command: { type: 'string' } }, ['command']),
       d('direct_search', 'Busca en web', { query: { type: 'string' } }, ['query']),

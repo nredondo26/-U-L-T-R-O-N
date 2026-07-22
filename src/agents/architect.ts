@@ -35,8 +35,9 @@ export class ArchitectAgent extends BaseAgent {
   constructor() {
     const config: AgentConfig = {
       name: 'Architect',
+      displayName: 'Visión',
       description: 'Planificador senior de proyectos. Analiza requerimientos largos y produce planes estructurados fase por fase.',
-      systemPrompt: `Eres el Architect de ULTRON, un planificador senior de software.
+      systemPrompt: `Eres Visión (Architect) de ULTRON, un planificador senior de software.
 
 CAPACIDADES:
 - Analizar requerimientos largos y complejos

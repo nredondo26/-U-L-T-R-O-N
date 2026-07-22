@@ -3,6 +3,7 @@ import type { ChatMessage, ToolDefinition, AgentContext } from '../shared/types'
 
 export interface AgentConfig {
   name: string;
+  displayName: string;
   description: string;
   systemPrompt: string;
   tools: ToolDefinition[];
@@ -32,6 +33,7 @@ export interface OrchestratorConfig {
 export interface AgentEvent {
   type: 'thought' | 'action' | 'result' | 'error' | 'delegate' | 'done';
   agent: string;
+  displayName?: string;
   message: string;
   data?: unknown;
 }

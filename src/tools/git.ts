@@ -1,10 +1,15 @@
-// src/tools/git.ts
-// Operaciones Git
-
 import { executeCommand } from './execute';
 
+function escapeArg(arg: string): string {
+  if (/[;&|`$(){}[\]!#~<>*?\\\s"]/.test(arg)) {
+    return `"${arg.replace(/"/g, '""')}"`;
+  }
+  return arg;
+}
+
 export async function gitCommand(args: string[], cwd: string): Promise<string> {
-  const result = await executeCommand('git ' + args.join(' '), cwd, 15000);
+  const escaped = args.map(escapeArg).join(' ');
+  const result = await executeCommand(`git ${escaped}`, cwd, 15000);
   return result.stdout || result.stderr || result.error || 'OK';
 }
 

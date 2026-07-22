@@ -66,6 +66,33 @@ describe('ObsidianVault', () => {
     const notes = vault.listNotes();
     expect(notes.length).toBe(3);
   });
+
+  it('limits buildContext to MAX_CONTEXT_NOTES', () => {
+    const vault = new ObsidianVault(vaultDir);
+    for (let i = 0; i < 100; i++) vault.writeNote(`nota_${i}`, `Note number ${i}`);
+    const ctx = vault.buildContext();
+    const lines = ctx.split('\n').filter(l => l.startsWith('- '));
+    expect(lines.length).toBeLessThanOrEqual(50);
+  });
+
+  it('cleans old auto-saved notes when over MAX_NOTES', () => {
+    const vault = new ObsidianVault(vaultDir);
+    for (let i = 0; i < 1005; i++) vault.writeNote(`nota_${i}`, `Note number ${i}`);
+    const vault2 = new ObsidianVault(vaultDir);
+    expect(vault2.listNotes().length).toBeLessThanOrEqual(1000);
+  });
+
+  it('readNote returns null for non-existent note', () => {
+    const vault = new ObsidianVault(vaultDir);
+    expect(vault.readNote('nonexistent')).toBeNull();
+  });
+
+  it('writeNote sanitizes unsafe filenames', () => {
+    const vault = new ObsidianVault(vaultDir);
+    const note = vault.writeNote('../malicious', 'content');
+    // Note is written inside vault, not escaped
+    expect(fs.existsSync(path.join(vaultDir, note.name + '.md'))).toBeTrue();
+  });
 });
 
 describe('SessionMemory', () => {

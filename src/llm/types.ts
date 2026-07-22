@@ -12,6 +12,7 @@ export interface LLMProvider {
 export interface ModelEntry {
   id: string;
   free: boolean;
+  codingScore?: number;
 }
 
 export interface LLMCompletionRequest {

@@ -12,8 +12,9 @@ export class EditorAgent extends BaseAgent {
   constructor(projectDir: string) {
     const config: AgentConfig = {
       name: 'Editor',
+      displayName: 'Artífice',
       description: 'Lee y modifica archivos del proyecto. Usa str_replace para cambios precisos.',
-      systemPrompt: `Eres el Editor de J.A.R.V.I.S., especializado en leer y modificar codigo fuente.
+      systemPrompt: `Eres Artífice (Editor) de J.A.R.V.I.S., especializado en leer y modificar codigo fuente.
       
 CAPACIDADES:
 - Leer archivos completos o rangos de lineas

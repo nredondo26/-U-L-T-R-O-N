@@ -13,7 +13,6 @@ import { analyzeDocument } from '../tools/document';
 import type { AgentEvent } from '../agents/types';
 import {
   welcome, hr, formatResponse, formatSlashResponse,
-  formatAgentAction, formatAgentResult,
   Spinner, printSelectMenu, showTokens, footer,
   resetStreamState, promptText, promptModel,
   setTheme, getThemeName, listThemes,
@@ -27,13 +26,13 @@ function ask(rl: readline.Interface, q: string): Promise<boolean> {
 }
 
 export async function runCLI(options: {
-  projectDir?: string; vaultDir?: string; envFile?: string;
+  projectDir?: string; vaultDir?: string; envFile?: string; orchestrator?: Orchestrator;
 }): Promise<void> {
   loadEnv(options.envFile);
   const projectDir = options.projectDir || process.cwd();
   const vaultDir = options.vaultDir || path.join(projectDir, 'vault');
   const providers = getProviders();
-  const orch = new Orchestrator({ projectDir, vaultDir, maxSteps: 25, verbose: true });
+  const orch = options.orchestrator || new Orchestrator({ projectDir, vaultDir, maxSteps: 25, verbose: true });
   const stats = orch.getStats();
 
   console.log(welcome(providers.map(p => p.name), orch.getCurrentModel(), stats.tokens, stats.requests, stats.history, getThemeName()));
@@ -114,7 +113,7 @@ export async function runCLI(options: {
         const r = await orch.handleMessage(input);
         if (!wasStreamed) console.log(r);
         await repair(rl, orch, r, input.slice(1).trim(), input, wasStreamed);
-      } catch (e: unknown) { console.log('    error: ' + (e instanceof Error ? e.message : String(e))); }
+      } catch (e: unknown) { console.log('  error: ' + (e instanceof Error ? e.message : String(e))); }
       console.log(footer(orch.getStats().tokens, orch.getStats().requests, orch.getCurrentModel()));
       busy = false; rl.prompt();
       return;
@@ -128,7 +127,7 @@ export async function runCLI(options: {
 
       switch (cmd) {
         case 'help': console.log(formatSlashResponse(await orch.handleMessage(input))); break;
-        case 'exit': case 'quit': console.log('\n    goodbye.\n'); rl.close(); process.exit(0);
+        case 'exit': case 'quit': console.log('\n  goodbye.\n'); rl.close(); process.exit(0);
         case 'models': {
           const allModels = getAllModels();
           const healthySet = new Set(getHealthyModelList().map(m => m.model));

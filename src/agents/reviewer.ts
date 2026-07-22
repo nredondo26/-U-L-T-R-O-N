@@ -8,8 +8,9 @@ export class ReviewerAgent extends BaseAgent {
   constructor() {
     const config: AgentConfig = {
       name: 'Reviewer',
+      displayName: 'Juez',
       description: 'Revisa cambios de codigo y sugiere mejoras.',
-      systemPrompt: `Eres el Reviewer de J.A.R.V.I.S., especializado en revision de codigo.
+      systemPrompt: `Eres Juez (Reviewer) de J.A.R.V.I.S., especializado en revision de codigo.
 
 CAPACIDADES:
 - Revisar cambios propuestos (diffs)

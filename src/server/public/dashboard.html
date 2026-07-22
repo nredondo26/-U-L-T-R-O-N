@@ -2,73 +2,105 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ULTRON — Agent Dashboard</title>
+<title>ULTRON — Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
-:root{--bg:#060608;--card:#0d0d14;--border:#1a1a2e;--red:#ef4444;--green:#10b981;--blue:#3b82f6;--yellow:#f59e0b;--purple:#8b5cf6;--cyan:#06b6d4;--text:#c8d0e0;--dim:#4a5570}
+:root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2a;--accent:#22d3ee;--accent-dim:rgba(34,211,238,0.12);--success:#4ade80;--warn:#fbbf24;--error:#f87171;--text:#e2e8f0;--dim:#6b7280;--font:system-ui,-apple-system,sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;height:100vh;overflow:hidden}
-.header{display:flex;align-items:center;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--border);gap:16px}
-.logo{font-weight:800;font-size:18px;color:var(--red);letter-spacing:2px}
-.status{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:12px;color:var(--dim)}
-.pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.main{display:grid;grid-template-columns:1fr 280px;height:calc(100vh - 53px)}
-.agents{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;align-content:start;overflow-y:auto}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;transition:.2s;position:relative}
-.card.active{border-color:var(--green);box-shadow:0 0 20px rgba(16,185,129,.15)}
-.card.error{border-color:var(--red)}
-.card.thinking{border-color:var(--yellow);animation:glow 1.5s ease-in-out infinite}
-@keyframes glow{0%,100%{box-shadow:0 0 10px rgba(245,158,11,.1)}50%{box-shadow:0 0 25px rgba(245,158,11,.25)}}
-.card-icon{font-size:28px;margin-bottom:6px}
-.card-name{font-weight:700;font-size:13px;margin-bottom:4px}
-.card-status{font-size:10px;color:var(--dim);margin-bottom:6px}
-.card-action{font-size:9px;color:var(--dim);height:28px;overflow:hidden;text-overflow:ellipsis}
-.bar{height:3px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden}
-.bar-fill{height:100%;border-radius:2px;transition:width .3s}
-/* SIDEBAR */
-.sidebar{background:var(--card);border-left:1px solid var(--border);padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
-.sidebar h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
-.event{font-size:10px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.02);display:flex;gap:8px;align-items:flex-start}
-.event .dot{width:6px;height:6px;border-radius:50%;margin-top:3px;flex-shrink:0}
-.event .agent-name{color:var(--yellow);font-weight:600;white-space:nowrap}
-.event .event-msg{color:var(--dim)}
-.event .time{font-size:8px;color:var(--dim);margin-left:auto;white-space:nowrap}
-.stats{display:flex;gap:12px;font-size:11px;color:var(--dim)}
+body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh;overflow:hidden;font-size:13px;line-height:1.5}
+.header{display:flex;align-items:center;padding:0 16px;height:48px;background:var(--surface);border-bottom:1px solid var(--border);gap:12px;flex-shrink:0}
+.logo{font-weight:700;font-size:15px;color:var(--accent);letter-spacing:1px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.stats{font-size:11px;color:var(--dim);display:flex;gap:12px}
 .stats span{color:var(--text)}
+.main{display:flex;height:calc(100vh - 48px)}
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.panel-scroll{overflow-y:auto;padding:12px;flex:1}
+.panel-scroll::-webkit-scrollbar{width:4px}.panel-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;transition:all .2s}
+.card.active{border-color:var(--success);box-shadow:0 0 16px rgba(74,222,128,.08)}
+.card.thinking{border-color:var(--warn);box-shadow:0 0 16px rgba(251,191,36,.08)}
+.card-icon{font-size:22px;margin-bottom:4px}
+.card-name{font-weight:600;font-size:12px}
+.card-status{font-size:10px;color:var(--dim)}
+.card-action{font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.bar{height:2px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width .3s ease;width:0%}
+.card-count{font-size:9px;color:var(--dim);margin-top:4px}
+.sidebar{width:300px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-title{padding:10px 14px;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:6px}
+.sidebar-scroll::-webkit-scrollbar{width:3px}.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.event{font-size:10px;padding:6px 8px;border-radius:6px;margin:2px 0;display:flex;gap:6px;align-items:flex-start;background:rgba(255,255,255,.02)}
+.event-dot{width:5px;height:5px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.event-agent{font-weight:600;white-space:nowrap;color:var(--accent)}
+.event-msg{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.event-time{font-size:8px;color:var(--dim);margin-left:auto;white-space:nowrap}
+
+/* Router panel */
+.router-panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px}
+.router-panel h3{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin-bottom:8px}
+.router-row{display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)}
+.router-row:last-child{border-bottom:none}
+.router-label{color:var(--dim)}
+.router-value{color:var(--text);font-weight:500}
+.tag-free{background:rgba(74,222,128,.15);color:var(--success);padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600}
+.tag-paid{background:rgba(251,191,36,.15);color:var(--warn);padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600}
+.tag-blocked{background:rgba(248,113,113,.15);color:var(--error);padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <span class="logo">ULTRON</span>
-  <span class="status"><div class="pulse"></div> agents active</span>
-  <span class="stats" id="topStats"></span>
+  <span class="logo">ULTRON</span><div class="status-dot"></div>
+  <span style="font-size:11px;color:var(--dim)">dashboard</span>
+  <div class="header-right">
+    <span class="stats" id="topStats"><span>0</span> tokens · <span>auto</span></span>
+  </div>
 </div>
 
 <div class="main">
-<div class="agents" id="agents"></div>
+<div class="content">
+  <div class="panel-scroll">
+    <!-- Agent grid -->
+    <div class="grid" id="agents"></div>
+
+    <!-- Router status -->
+    <div class="router-panel" id="routerPanel">
+      <h3>Smart Router</h3>
+      <div class="router-row"><span class="router-label">Strategy</span><span class="router-value">auto (free-first + coding)</span></div>
+      <div class="router-row"><span class="router-label">Current model</span><span class="router-value" id="rtrModel">—</span></div>
+      <div class="router-row"><span class="router-label">Free models</span><span class="router-value" id="rtrFree">—</span></div>
+      <div class="router-row"><span class="router-label">Blocked providers</span><span class="router-value" id="rtrBlocked">none</span></div>
+      <div class="router-row"><span class="router-label">Providers cost</span><span class="router-value" id="rtrCost">$0.00</span></div>
+      <div class="router-row" id="rtrTopModelRow"><span class="router-label">Top free coding</span><span class="router-value" id="rtrTopModel">—</span></div>
+    </div>
+  </div>
+</div>
 <div class="sidebar">
-  <h3>Live Activity</h3>
-  <div id="events"></div>
+  <div class="sidebar-title">Live Activity</div>
+  <div class="sidebar-scroll" id="events"><div style="color:var(--dim);font-size:10px;padding:8px;text-align:center">Waiting for events...</div></div>
 </div>
 </div>
 
 <script>
 const AGENTS = [
-  { id:'Orchestrator', icon:'◆', color:'#ef4444', desc:'Coordinator' },
-  { id:'Architect', icon:'◈', color:'#f59e0b', desc:'Planner' },
-  { id:'Editor', icon:'✎', color:'#10b981', desc:'Code' },
-  { id:'Librarian', icon:'◉', color:'#3b82f6', desc:'Analysis' },
-  { id:'Basher', icon:'⬢', color:'#8b5cf6', desc:'Terminal' },
-  { id:'Researcher', icon:'◇', color:'#06b6d4', desc:'Web' },
-  { id:'Thinker', icon:'◎', color:'#f59e0b', desc:'Strategy' },
-  { id:'Reviewer', icon:'○', color:'#f59e0b', desc:'Review' },
+  { id:'Orchestrator', displayName:'Cerebro',     icon:'⬡', color:'#22d3ee', desc:'Coordinator' },
+  { id:'Architect',    displayName:'Visión',      icon:'△', color:'#f59e0b', desc:'Planner' },
+  { id:'Editor',       displayName:'Artífice',    icon:'◇', color:'#4ade80', desc:'Code' },
+  { id:'Librarian',    displayName:'Sabio',       icon:'○', color:'#60a5fa', desc:'Analysis' },
+  { id:'Basher',       displayName:'Ejecutor',    icon:'▽', color:'#a78bfa', desc:'Terminal' },
+  { id:'Researcher',   displayName:'Explorador',  icon:'□', color:'#2dd4bf', desc:'Web' },
+  { id:'Thinker',      displayName:'Estratega',   icon:'◎', color:'#fb923c', desc:'Strategy' },
+  { id:'Reviewer',     displayName:'Juez',        icon:'☆', color:'#f472b6', desc:'Review' },
 ];
 
 const state = {};
-let tokens = 0, model = '';
+let tokens = 0, model = 'auto';
 
-// Build cards
+// Build agent cards
 const agentsDiv = document.getElementById('agents');
 for (const a of AGENTS) {
   state[a.id] = { status:'idle', action:'', count:0 };
@@ -76,11 +108,11 @@ for (const a of AGENTS) {
   div.className = 'card'; div.id = 'card-' + a.id;
   div.innerHTML = `
     <div class="card-icon" style="color:${a.color}">${a.icon}</div>
-    <div class="card-name">${a.id}</div>
+    <div class="card-name">${a.displayName || a.id}</div>
     <div class="card-status">${a.desc}</div>
     <div class="card-action">idle</div>
-    <div class="bar"><div class="bar-fill" style="width:0%;background:${a.color}"></div></div>
-    <div style="font-size:8px;color:var(--dim);margin-top:4px">actions: <span id="cnt-${a.id}">0</span></div>
+    <div class="bar"><div class="bar-fill" style="background:${a.color}"></div></div>
+    <div class="card-count">actions: <span id="cnt-${a.id}">0</span></div>
   `;
   agentsDiv.appendChild(div);
 }
@@ -92,7 +124,7 @@ function setAgent(agent, status, action) {
   if (status === 'active') s.count++;
   const card = document.getElementById('card-' + agent);
   if (!card) return;
-  card.className = 'card ' + (status === 'active' ? 'thinking' : status === 'error' ? 'error' : status === 'done' ? 'active' : '');
+  card.className = 'card ' + (status === 'active' ? 'thinking' : status === 'error' ? 'active' : '');
   card.querySelector('.card-action').textContent = status === 'active' ? s.action || 'working...' : status;
   card.querySelector('.bar-fill').style.width = status === 'active' ? '60%' : status === 'done' ? '100%' : '0%';
   document.getElementById('cnt-' + agent).textContent = s.count;
@@ -102,39 +134,64 @@ function addEvent(agent, msg, color) {
   const evDiv = document.getElementById('events');
   const div = document.createElement('div');
   div.className = 'event';
-  const now = new Date().toTimeString().slice(0,8);
-  div.innerHTML = `<div class="dot" style="background:${color || '#f59e0b'}"></div><span class="agent-name">${agent}</span><span class="event-msg">${msg.slice(0,80)}</span><span class="time">${now}</span>`;
+  const now = new Date().toLocaleTimeString();
+  div.innerHTML = `<div class="event-dot" style="background:${color || '#22d3ee'}"></div><span class="event-agent">${agent}</span><span class="event-msg">${(msg||'').slice(0,80)}</span><span class="event-time">${now}</span>`;
   evDiv.prepend(div);
-  if (evDiv.children.length > 50) evDiv.lastChild.remove();
+  if (evDiv.children.length > 100) evDiv.lastChild.remove();
 }
 
 function updateStats() {
-  document.getElementById('topStats').innerHTML = `<span>${model}</span> · tokens <span>${tokens.toLocaleString()}</span>`;
+  document.getElementById('topStats').innerHTML = `<span>${tokens.toLocaleString()}</span> tokens · <span>${model}</span>`;
 }
+
+// Fetch router state periodically
+async function fetchRouterState() {
+  try {
+    const r = await fetch('/api/router');
+    const d = await r.json();
+    if (d.circuitBreaker) {
+      const blocked = Object.entries(d.circuitBreaker.providers || {}).filter(([,v]) => v.blocked).map(([k]) => k);
+      document.getElementById('rtrBlocked').textContent = blocked.length ? blocked.join(', ') : 'none';
+      document.getElementById('rtrBlocked').className = blocked.length ? 'tag-blocked' : 'router-value';
+    }
+    if (d.costs) {
+      const total = d.costs.reduce((s, c) => s + c.cost, 0);
+      document.getElementById('rtrCost').textContent = '$' + total.toFixed(4);
+    }
+  } catch(e) {}
+}
+fetchRouterState();
+setInterval(fetchRouterState, 5000);
 
 // SSE connection
 const es = new EventSource('/ws');
 es.addEventListener('init', e => {
-  const d = JSON.parse(e.data);
-  model = d.model || '?';
-  updateStats();
+  try {
+    const d = JSON.parse(e.data);
+    model = d.model || 'auto';
+    tokens = d.stats?.tokens || 0;
+    updateStats();
+  } catch(e) {}
 });
+
 es.addEventListener('event', e => {
-  const d = JSON.parse(e.data);
-  if (d.type === 'action') {
-    setAgent(d.agent, 'active', d.message);
-    addEvent(d.agent, d.message, AGENTS.find(a=>a.id===d.agent)?.color);
-  } else if (d.type === 'done') {
-    setAgent(d.agent, 'done', '');
-  } else if (d.type === 'thought') {
-    setAgent(d.agent, 'active', 'thinking...');
-  }
+  try {
+    const d = JSON.parse(e.data);
+    if (d.type === 'action') {
+      setAgent(d.agent, 'active', d.message);
+      addEvent(d.agent, d.message, AGENTS.find(a=>a.id===d.agent)?.color);
+    } else if (d.type === 'done') {
+      setAgent(d.agent, 'done', '');
+    } else if (d.type === 'thought') {
+      setAgent(d.agent, 'active', 'thinking...');
+    }
+  } catch(e) {}
 });
-es.addEventListener('stream', e => {
-  const d = JSON.parse(e.data);
-  // Reset all to idle when streaming starts
+
+es.addEventListener('stream', () => {
   for (const a of AGENTS) setAgent(a.id, 'idle', '');
 });
+
 es.addEventListener('error', () => {
   for (const a of AGENTS) setAgent(a.id, 'error', 'connection lost');
 });
