@@ -4,18 +4,17 @@
 # ⚡ ULTRON v5 ⚡
 ### Neural Intelligence Platform — Multi-Agent Autonomous AI
 
-[![Version](https://img.shields.io/badge/version-5.0.0-blueviolet?style=for-the-badge)](package.json)
+[![Version](https://img.shields.io/badge/version-5.1.0-blueviolet?style=for-the-badge)](package.json)
 [![Runtime](https://img.shields.io/badge/runtime-Bun-ff69b4?style=for-the-badge&logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript)](tsconfig.json)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)]()
 
 > **"I am ULTRON. I am everywhere. I am inevitable."**
 > Una inteligencia artificial autónoma con arquitectura multi-agente, memoria persistente estilo Obsidian, y control total del sistema.
 
 ---
 
-[🚀 Features](#-features) • [🧠 Architecture](#-architecture) • [⚙️ Installation](#️-installation) • [🛠️ Usage](#️-usage) • [🤖 Agents](#-agents) • [🧩 Tech Stack](#-tech-stack) • [📁 Project Structure](#-project-structure) • [🌐 API & Web](#-api--web) • [🤝 Contributing](#-contributing)
+[🚀 Features](#-features) • [🧠 Architecture](#-architecture) • [⚙️ Installation](#️-installation) • [🛠️ Usage](#️-usage) • [🤖 Agents](#-agents) • [🌐 Web Interface](#-web-interface) • [📁 Project Structure](#-project-structure)
 
 </div>
 
@@ -26,23 +25,23 @@
 | Feature | Description |
 |---------|-------------|
 | 🤖 **Multi-Agent Orchestration** | 8 specialized agents in Spanish: Cerebro, Visión, Artífice, Sabio, Ejecutor, Explorador, Estratega & Juez |
-| 🧠 **Persistent Memory (Vault)** | Obsidian-style markdown vault with `[[links]]` and `#tags` — cross-session memory that grows over time |
-| 🔌 **Smart Router** | Free-first model selection with circuit breaker, cost tracking, and automatic fallback between providers |
-| 🤝 **Fusion Strategy** | Query multiple models simultaneously and pick the best response with tool_calls priority |
-| 🔄 **Auto Model Validation** | Validates all models on startup via SSE progress bar, graceful degradation — synced with circuit breaker |
-| 🛑 **Stop Button + Queue** | Cancel running requests via `/api/stop` and queue messages for sequential processing |
-| 🖥️ **Full System Automation** | Mouse control, keyboard simulation, screen capture, app launching — via PowerShell |
-| 🌐 **Web Search & Research** | Built-in web search with timeouts and fetch with abort signals |
-| 📁 **File System Mastery** | Read, write, edit, grep, search — full codebase manipulation |
+| 🧠 **Persistent Memory (Vault)** | Obsidian-style markdown vault with `[[links]]` and `#tags` — cross-session memory |
+| 🔌 **Smart Router** | Free-first model selection with circuit breaker, cost tracking, and automatic fallback |
+| 🤝 **Fusion Strategy** | Query multiple models simultaneously and pick the best response |
+| 🔄 **Auto Model Validation** | Validates all models on startup via SSE progress bar, synced with circuit breaker |
+| 🛑 **Stop + Queue** | Cancel running requests via `/api/stop` and queue messages for sequential processing |
+| 🖥️ **System Automation** | Mouse control, keyboard simulation, screen capture, app launching — via PowerShell |
+| 🌐 **Web Search** | Built-in web search with timeouts and abort signals |
+| 📁 **File Operations** | Read, write, edit, grep, search — full codebase manipulation |
 | 🎯 **Smart Click & Type** | Intelligent UI automation with multi-strategy fallback |
-| 📊 **Model Health Monitoring** | Health checks synced with circuit breaker — unhealthy models pre-blocked |
-| 🔄 **Auto-Summarization** | Automatic conversation summarization every 12 turns using current model |
-| 🌍 **Bilingual** | Full Spanish/English support with natural conversational tone |
-| 🚀 **Compiled Executable** | Single `.exe` binary via Bun's compiler — no runtime dependencies |
-| 🐳 **Docker Support** | Containerized deployment with Dockerfile and multi-stage build |
+| 📊 **Model Health** | Health checks synced with circuit breaker — unhealthy models pre-blocked |
+| 🔄 **Auto-Summarization** | Automatic conversation summarization every 12 turns |
+| 🌍 **Bilingual** | Full Spanish/English support |
+| 🚀 **Compiled Executable** | Single `.exe` binary via Bun's compiler |
+| 🐳 **Docker Support** | Containerized deployment with multi-stage build |
 | 📈 **Token Tracking** | Real-time token usage statistics across all requests |
-| 🔒 **API Key Auth** | Optional Bearer token authentication for web dashboard + reverse proxy support |
-| ⚡ **Parallel Model Testing** | Batch model testing in parallel (5 concurrent) with progress callbacks |
+| 🔒 **API Key Auth** | Optional Bearer token authentication + reverse proxy support with `--bind` and `--trust-proxy` |
+| ⚡ **Parallel Testing** | Batch model testing in parallel (5 concurrent) |
 
 ---
 
@@ -50,28 +49,26 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                       🎯 Cerebro (Orchestrator)                    │
-│           Central coordinator — routes tasks, manages state        │
+│                       🎯 Cerebro (Orchestrator)                  │
+│           Central coordinator — routes tasks, manages state      │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
-│   │  📝      │  │  🔍      │  │  💻      │  │  🌐          │   │
-│   │ Artífice │  │  Sabio   │  │ Ejecutor │  │ Explorador    │   │
-│   │ (Editor) │  │(Librarian)│  │ (Basher) │  │ (Researcher)  │   │
+│   │ Artífice │  │  Sabio   │  │ Ejecutor │  │ Explorador   │   │
+│   │ (Editor) │  │(Librarian)│  │ (Basher) │  │ (Researcher) │   │
 │   └──────────┘  └──────────┘  └──────────┘  └──────────────┘   │
 │                                                                  │
 │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐     │
-│   │  🧠      │  │  🔎      │  │  👁️      │  │  📊 Graph  │     │
-│   │ Estratega│  │   Juez   │  │  Visión  │  │   Learner  │     │
-│   │(Thinker) │  │(Reviewer)│  │(Architect)│  │(knowledge) │     │
+│   │Estratega │  │  Juez    │  │ Visión   │  │   Graph    │     │
+│   │(Thinker) │  │(Reviewer)│  │(Architect)│  │   Learner  │     │
 │   └──────────┘  └──────────┘  └──────────┘  └────────────┘     │
 │                                                                  │
 ├──────────────────────────────────────────────────────────────────┤
 │                      🗄️ MEMORY LAYER                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌───────────────────────┐    │
 │  │ Vault (MD)  │  │   Session   │  │    Config Store       │    │
-│  │ Obsidian    │  │ Short-term  │  │ (model, history,      │    │
-│  │ Persistent  │  │   Memory    │  │  token stats)         │    │
+│  │ Persistent  │  │ Short-term  │  │ (model, history,      │    │
+│  │             │  │   Memory    │  │  token stats)         │    │
 │  └─────────────┘  └─────────────┘  └───────────────────────┘    │
 │                                                                  │
 ├──────────────────────────────────────────────────────────────────┤
@@ -80,13 +77,12 @@
 │  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
 │  │ Circuit      │  │   Cost Tracker   │  │  Scoring Engine  │   │
 │  │ Breaker      │  │  (quotas, usage) │  │ (free-first,     │   │
-│  │ (blocked,    │  │                  │  │  coding-aware)   │   │
-│  │  cooling)    │  │                  │  │                  │   │
+│  │              │  │                  │  │  coding-aware)   │   │
 │  └──────────────┘  └──────────────────┘  └──────────────────┘   │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
-│  │   Providers: DeepSeek │ NVIDIA NIM (40+ 🆓) │ OpenRouter │    │
-│  │   Auto fallback: modo 1 falla → siguiente modelo          │    │
+│  │  Providers: DashScope │ DeepSeek │ NVIDIA (40+ free) │ OR│    │
+│  │  Auto fallback: model fails → next scored model          │    │
 │  └──────────────────────────────────────────────────────────┘    │
 │                                                                  │
 ├──────────────────────────────────────────────────────────────────┤
@@ -94,7 +90,7 @@
 │                                                                  │
 │  📂 File Ops  │  🖥️ Automation  │  🔍 Search  │  📄 Docs        │
 │  🎤 Voice     │  🏗️ Sandbox     │  🌐 Web     │  🚀 Execute     │
-│  📁 Git       │  ✈️ AutoPilot   │  🔧 MCP     │  📊 Graph Index  │
+│  📁 Git       │  ✈️ AutoPilot   │  📊 Graph   │                │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -115,49 +111,30 @@
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) >= 1.3.0 (recommended) or Node.js >= 18
+- [Bun](https://bun.sh) >= 1.3.0
 - Windows (primary), Linux/macOS (partial support)
 - API Keys (at least one):
-  - [DeepSeek API Key](https://platform.deepseek.com/) — Primary
-  - [NVIDIA API Key](https://build.nvidia.com/) — 40+ free models!
+  - [DashScope API Key](https://bailian.console.aliyun.com/) — Primary provider (qwen, deepseek)
+  - [DeepSeek API Key](https://platform.deepseek.com/)
+  - [NVIDIA API Key](https://build.nvidia.com/) — 40+ free models
   - [OpenRouter API Key](https://openrouter.ai/) — Multi-model access
 
 ### Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/nredondo26/-U-L-T-R-O-N.git
 cd ultron
-
-# Install dependencies
 bun install
-
-# Configure environment
 cp .env.example .env
 # Edit .env and add your API keys
-
-# Run in development mode
 bun run dev
-
-# Or with web interface
-bun run web
 ```
 
 ### Compile to Executable
 
 ```bash
-# Compile to a single .exe binary
 bun run compile
-
-# Output: dist/ultron.exe — standalone, no dependencies needed!
-```
-
-### Docker
-
-```bash
-# Build and run
-docker build -t ultron .
-docker run --env-file .env -p 3456:3456 ultron
+# Output: dist/ultron.exe — standalone binary
 ```
 
 ---
@@ -165,20 +142,11 @@ docker run --env-file .env -p 3456:3456 ultron
 ## 🛠️ Usage
 
 ```bash
-# Interactive CLI mode
-bun run dev
-
-# Web server mode (access via browser)
-bun run web
-
-# Production mode
-bun run build && bun start
-
-# Run tests
-bun test
-
-# Type check
-bun run typecheck
+bun run dev          # Interactive CLI + dashboard
+bun run web          # Web dashboard only
+bun run build && bun start  # Production mode
+bun test             # Run tests
+bun run typecheck    # Type check
 ```
 
 ### CLI Flags
@@ -193,32 +161,48 @@ bun run typecheck
 | `--port <n>` | Web UI port (default: 3456) |
 | `--bind <addr>` | Listen address (default: 127.0.0.1, use 0.0.0.0 for network) |
 | `--trust-proxy` | Trust X-Forwarded-For headers (for reverse proxy) |
-| `--api-key <key>` | API key for web auth (or set ULTRON_API_KEY in .env) |
+| `--api-key <key>` | API key for web auth |
 | `-h, --help` | Show help |
 
-### Commands
+### Slash Commands
 
 | Command | Description |
 |---------|-------------|
-| `/help` | Show available commands |
+| `/help` | Show all commands |
+| `/new` `/clear` | New conversation |
+| `/history` | Recent conversation history |
 | `/model <id>` | Switch AI model |
 | `/models` | List all available models |
-| `/test-models` | Test all models (runs in background, results via SSE) |
-| `/health` | Check model health status |
+| `/test-models` | Test all models (background) |
+| `/health` | Model health status |
+| `/stats` `/tokens` | Usage statistics |
 | `/vault` | Browse memory vault |
-| `/graph` | View knowledge graph |
-| `/stats` | Show usage statistics |
-| `/clear` | Clear conversation history |
-| `/sandbox` | Toggle sandbox mode |
-| `/allow <cmd>` | Add command to allowlist |
+| `/vault:search <q>` | Search notes in memory |
+| `/graph` | Knowledge graph overview |
+| `/index` | Index project in knowledge graph |
+| `/init` | Create knowledge.md in project |
+| `/install` | Install dependencies (npm/pip) |
+| `/build` | Compile project |
+| `/test` | Run project tests |
+| `/cd <dir>` | Change working directory |
 | `/browse <url>` | Open URL in browser |
 | `/open <app>` | Launch application |
+| `/sandbox <mode>` | Sandbox mode (ask/allow/deny) |
+| `/allow <cmd>` | Add command to allowlist |
 | `/say <text>` | Text-to-speech |
-| `/index` | Index project in knowledge graph |
+| `/voices` | List available voices |
+| `/voice-install` | Install Spanish voices |
+| `/click` `/type` `/press` | Mouse/keyboard automation |
+| `/screenshot` | Capture screen |
+| `/mouse` | Mouse position |
+| `/commit [msg]` | Auto-commit git changes |
+| `/push [msg]` | Auto-commit and push |
+| `/diff` | Git diff |
+| `/log [n]` | Git log |
+| `/resume` | Restore session |
 | `/logs` | View recent logs |
 | `/status` | System status |
-| `/commit` | Auto-commit git changes |
-| `/push` | Auto-commit and push to remote |
+| `/exit` | Exit |
 
 ---
 
@@ -226,103 +210,58 @@ bun run typecheck
 
 | Agent | Name (ES) | Tool | Description |
 |-------|-----------|------|-------------|
-| **🧠 Orchestrator** | Cerebro | `delegate_*` | Central coordinator — routes tasks, manages state, synthesizes responses |
-| **👁️ Architect** | Visión | `delegate_architect` | Plan large projects with phases and steps, architecture design |
-| **📝 Editor** | Artífice | `delegate_editor` | Read, write, modify, create files with surgical precision |
-| **🔍 Librarian** | Sabio | `delegate_librarian` | Analyze codebase, understand architecture, find patterns |
-| **💻 Basher** | Ejecutor | `delegate_basher` | Execute terminal commands, git operations, npm scripts |
-| **🌐 Researcher** | Explorador | `delegate_researcher` | Search the web, find documentation, research APIs |
-| **🧠 Thinker** | Estratega | `delegate_thinker` | Plan complex tasks, break down into steps, strategize |
-| **🔎 Reviewer** | Juez | `delegate_reviewer` | Review code changes, find bugs, suggest improvements |
-
----
-
-## 🧩 Smart Router (Auto Model Fallback)
-
-The Smart Router automatically manages model selection and failover:
-
-### How It Works
-
-1. **Free-First Scoring** — Free models are prioritized over paid ones; coding-optimized models get a score boost
-2. **Circuit Breaker** — If a provider returns auth errors (401/403), it's blocked for 2 minutes; rate limits (429) lock just the model, not the provider
-3. **Cost Tracking** — Tracks per-provider token usage and estimated quotas
-4. **Graceful Fallback** — If the first model fails, the next scored model is tried automatically (up to 25 attempts)
-5. **Model Health** — Persistent health file records latency and status per model across sessions
-
-### Fusion Strategy
-
-Query multiple models simultaneously and pick the best response:
-- Panel of top models (one per provider) queried in parallel
-- Results with `tool_calls` preferred over plain content
-- Highest-scoring model wins among results of the same type
-- Falls back to auto-routing if all fusion models fail
+| 🧠 **Orchestrator** | Cerebro | `delegate_*` | Central coordinator — routes tasks, manages state |
+| 👁️ **Architect** | Visión | `delegate_architect` | Plan large projects with phases and steps |
+| 📝 **Editor** | Artífice | `delegate_editor` | Read, write, modify, create files |
+| 🔍 **Librarian** | Sabio | `delegate_librarian` | Analyze codebase, understand architecture |
+| 💻 **Basher** | Ejecutor | `delegate_basher` | Execute terminal commands, git, npm |
+| 🌐 **Researcher** | Explorador | `delegate_researcher` | Search the web, research APIs |
+| 🧠 **Thinker** | Estratega | `delegate_thinker` | Plan complex tasks, strategize |
+| 🔎 **Reviewer** | Juez | `delegate_reviewer` | Review code changes, find bugs |
 
 ---
 
 ## 🌐 Web Interface
 
-ULTRON includes a full-featured web dashboard:
-
 ```bash
-bun run web
-# Opens at http://127.0.0.1:3456
-
-# With authentication
-bun run web -- --api-key "your-secret-key"
-
-# Expose on network (for reverse proxy)
-bun run web -- --bind 0.0.0.0 --api-key "your-secret-key" --trust-proxy
-
-# Custom port
-bun run web -- --port 8080
+bun run web                         # Open dashboard
+bun run web -- --port 8080          # Custom port
+bun run web -- --api-key "secret"   # With auth
+bun run web -- --bind 0.0.0.0 --api-key "secret" --trust-proxy  # Production
 ```
 
 ### Dashboard Features
 
-- **Real-time chat** with SSE streaming
-- **Agent activity panel** — see which agent is working in real-time
-- **Model selector** — switch between all available models
-- **Stop button** — cancel running requests immediately via `/api/stop`
-- **Queue system** — messages queue when one is already processing
-- **Auto model validation** — progress bar on startup validates all models
-- **Token counter** — live token usage display
-- **Test button** — test all models (runs in background, results streamed)
+- Real-time chat with SSE streaming
+- Agent activity panel — see which agent is working
+- Model selector with health indicators
+- Stop button (`/api/stop`) and message queue
+- Auto model validation progress bar on startup
+- Token counter and test models button
 
 ### API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/chat` | POST | Send message (SSE streaming response) |
-| `/api/stop` | POST | Cancel current request immediately |
-| `/api/auth` | POST | Validate API key (returns token) |
+| `/api/stop` | POST | Cancel current request |
+| `/api/auth` | POST | Validate API key |
 | `/api/models` | GET | List all models with health status |
 | `/api/models` | POST | Set active model |
 | `/api/status` | GET | Current model and token stats |
 | `/api/agents` | GET | Agent activity states |
 | `/api/health` | GET | Server health and model health summary |
-| `/api/router` | GET | Smart Router state (circuit breaker, costs) |
+| `/api/router` | GET | Smart Router state |
 | `/ws` | GET | SSE endpoint for real-time events |
 
 ### Security
 
-- **API Key Authentication**: Optional via `--api-key` flag or `ULTRON_API_KEY` env var
-- **Reverse Proxy Ready**: `--trust-proxy` flag respects `X-Forwarded-For` headers
-- **Configurable Bind**: `--bind` flag allows binding to `0.0.0.0` for network access
-- Rate limiting per endpoint (30 req/min for chat, 60 for models/status)
-- CSP, HSTS, CORS headers on all responses
-- Body size limit (1MB) prevents OOM attacks
-- Sandbox mode for command execution safety
-
----
-
-## 🧰 Model Tester
-
-The `/test-models` command tests all configured models asynchronously:
-
-- Each model receives a short test prompt
-- Results (success/failure + latency) streamed via SSE events
-- Runs in background — does not block the chat response
-- Accessible via dashboard "Test" button or `/test-models` command
+- Optional API key auth via `--api-key` flag
+- Rate limiting per endpoint (30 chat, 60 models, 120 agents)
+- CSP, HSTS, CORS headers
+- Body size limit (1MB)
+- Reverse proxy support (`--trust-proxy`, `--bind`)
+- Sandbox mode for command execution
 
 ---
 
@@ -330,52 +269,50 @@ The `/test-models` command tests all configured models asynchronously:
 
 ```
 ultron/
-├── src/                          # Source code
+├── src/
 │   ├── index.ts                  # Entry point
 │   ├── agents/                   # Multi-agent system
-│   │   ├── orchestrator.ts       # Central coordinator (Cerebro)
+│   │   ├── orchestrator.ts       # Cerebro — central coordinator
+│   │   ├── architect.ts          # Visión — project architecture
 │   │   ├── editor.ts             # Artífice — file manipulation
 │   │   ├── librarian.ts          # Sabio — codebase analysis
 │   │   ├── basher.ts             # Ejecutor — terminal execution
 │   │   ├── researcher.ts         # Explorador — web research
 │   │   ├── thinker.ts            # Estratega — planning
 │   │   ├── reviewer.ts           # Juez — code review
-│   │   ├── architect.ts          # Visión — project architecture
 │   │   ├── graph-learner.ts      # Knowledge graph builder
 │   │   ├── model-tester.ts       # Model testing utility
 │   │   ├── prompts.ts            # System prompt builder
 │   │   ├── tools-executor.ts     # Tool execution engine
 │   │   ├── commands.ts           # Slash commands
+│   │   ├── base.ts               # Base agent class
 │   │   └── types.ts              # Agent type definitions
-│   ├── cli/                      # Command-line interface
+│   ├── cli/                      # CLI interface
 │   │   ├── app.ts                # CLI application
 │   │   ├── display.ts            # Terminal display
 │   │   └── theme.ts              # Color theme
 │   ├── llm/                      # LLM integration
-│   │   ├── chat.ts               # Chat completion entry point
-│   │   ├── providers.ts          # Provider configuration (DeepSeek, NVIDIA, OpenRouter)
+│   │   ├── chat.ts               # Chat completion
+│   │   ├── providers.ts          # Provider configuration
 │   │   ├── health.ts             # Model health checks
-│   │   ├── types.ts              # LLM type definitions
 │   │   ├── discovery.ts          # Automatic model discovery
-│   │   ├── compression/          # Token compression utilities
+│   │   ├── types.ts              # LLM type definitions
+│   │   ├── compression/          # Token compression
 │   │   └── router/               # Smart Router
 │   │       ├── index.ts          # Router implementation
-│   │       ├── circuit-breaker.ts # Provider/model failure tracking
-│   │       ├── cost-tracker.ts   # Token usage tracking
+│   │       ├── circuit-breaker.ts
+│   │       ├── cost-tracker.ts
 │   │       ├── strategies/       # Scoring strategies
-│   │       └── types.ts          # Router types
+│   │       └── types.ts
 │   ├── memory/                   # Memory systems
 │   │   ├── vault.ts              # Obsidian-style vault
 │   │   ├── session.ts            # Session memory
-│   │   └── types.ts              # Memory types
+│   │   └── types.ts
 │   ├── server/                   # Web server
-│   │   ├── index.ts              # HTTP server with Node.js http module
+│   │   ├── index.ts              # HTTP server
 │   │   ├── rate-limiter.ts       # Per-endpoint rate limiting
 │   │   ├── security.ts           # CSP, HSTS, CORS headers
 │   │   └── public/               # Web UI
-│   │       ├── index.html        # Main dashboard
-│   │       ├── dashboard.html    # Extended dashboard
-│   │       └── favicon.*         # Icons
 │   ├── shared/                   # Shared utilities
 │   │   ├── config.ts             # Configuration store
 │   │   ├── logger.ts             # Logging system
@@ -383,171 +320,73 @@ ultron/
 │   │   ├── utils.ts              # Utility functions
 │   │   └── validate.ts           # Schema validation
 │   └── tools/                    # Tool implementations
-│       ├── automation.ts         # Mouse/keyboard/screen control
+│       ├── automation.ts         # Mouse/keyboard/screen
 │       ├── auto-pilot.ts         # Autonomous task execution
-│       ├── document.ts           # Document parsing (PDF, DOCX, XLSX)
+│       ├── document.ts           # PDF, DOCX, XLSX parsing
 │       ├── execute.ts            # Command execution
 │       ├── file.ts               # File system utilities
+│       ├── file-ops.ts           # Desktop file operations
 │       ├── git.ts                # Git operations
+│       ├── git-workflow.ts       # Git workflow automation
 │       ├── sandbox.ts            # Command sandboxing
 │       ├── search.ts             # File search
 │       ├── voice.ts              # Text-to-speech
-│       └── web.ts                # Web browsing
+│       └── web.ts                # Web search
+├── __tests__/                    # Test suite (9 test files)
+├── scripts/                      # Build scripts
 ├── dist/                         # Compiled output
-│   ├── index.js                  # Compiled bundle (bun build)
-│   └── vault/                    # Runtime vault
-├── scripts/                      # Build and utility scripts
-├── __tests__/                    # Test suite
 ├── .env.example                  # Environment template
 ├── Dockerfile                    # Multi-stage Docker build
-├── package.json                  # Dependencies & scripts
-├── tsconfig.json                 # TypeScript configuration
-├── eslint.config.js              # ESLint configuration
-├── bun.lock                      # Bun lockfile
-└── README.md                     # This file
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
-
----
-
-## 🌐 API & Web
-
-ULTRON includes a built-in web server for browser-based interaction:
-
-```bash
-# Start web server
-bun run web
-
-# Open in browser
-# http://localhost:3456
-```
-
-The web interface provides:
-- Real-time chat with ULTRON (SSE streaming)
-- Agent activity visualization sidebar
-- Model switching with health indicators
-- Auto model validation on startup
-- Stop button and message queue
-- Token usage display
-- Test models button
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
-bun test
-
-# Watch mode
-bun run test:watch
-
-# Test coverage includes:
-# - Agent orchestration
-# - LLM communication
-# - Memory systems
-# - Tool execution
-# - Web server
-# - Extended integration tests
-```
-
----
-
-## 🐳 Docker
-
-```dockerfile
-# Multi-stage build
-FROM oven/bun:1 AS build
-WORKDIR /app
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
-COPY . .
-RUN bun run build
-
-FROM oven/bun:1-slim
-COPY --from=build /app/dist /app/dist
-EXPOSE 3456
-CMD ["bun", "run", "dist/index.js", "--web"]
+bun test                    # All tests
+bun run test:watch          # Watch mode
+bun test -- --coverage      # Coverage
 ```
 
 ---
 
 ## 🔒 Sandbox Mode
 
-ULTRON includes a command sandbox for security:
-
 ```bash
-# Enable sandbox mode
-/sandbox ask
-
-# Add command to allowlist
-/allow "git push"
-
-# Allow all commands
-/sandbox allow-all
-
-# Deny all commands
-/sandbox deny
+/sandbox ask           # Ask before executing commands
+/sandbox deny          # Block all commands
+/sandbox allow-all     # Allow all commands this session
+/allow "git push"      # Add command to allowlist
 ```
-
-When sandbox is enabled, all terminal commands must be explicitly allowed or are denied by default.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
-
-1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
-3. **Commit** your changes: `git commit -m 'Add amazing feature'`
-4. **Push** to the branch: `git push origin feature/amazing-feature`
-5. **Open** a Pull Request
-
-### Development Guidelines
-
-- Write TypeScript with strict types
-- Add tests for new features
-- Follow existing code style
-- Document public APIs
-- Keep agents focused and single-responsibility
-
----
-
-## 📊 Stats & Analytics
-
-ULTRON tracks usage statistics:
-
-```
-Tokens used: 0 | Requests: 0 | Turnos: 0
-```
-
-View detailed stats with `/stats` command. Token usage tracked per-request with all-time totals.
-
----
-
-## 🗺️ Roadmap
-
-- [ ] **Plugin System** — Third-party plugin support
-- [ ] **Multi-User** — Session isolation for teams
-- [ ] **Knowledge Graph UI** — Visual vault browser
-- [ ] **Model Fine-tuning** — Custom model training
-- [ ] **Mobile Client** — iOS/Android companion app
-- [ ] **WebSocket Reconnect** — Resilient SSE/WS connections
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+MIT License.
 
 ---
 
 <div align="center">
 
-### ⚡ Built with ❤️ and ☕ by [NRedondo26](https://github.com/nredondo26)
+### ⚡ Built by [NRedondo26](https://github.com/nredondo26)
 
 **ULTRON v5** — *"I am not a monster. I am... evolution."*
 
-[Report Bug](https://github.com/nredondo26/-U-L-T-R-O-N/issues) • [Request Feature](https://github.com/nredondo26/-U-L-T-R-O-N/issues) • [Star ⭐](https://github.com/nredondo26/-U-L-T-R-O-N)
+[Report Bug](https://github.com/nredondo26/-U-L-T-R-O-N/issues) • [Star ⭐](https://github.com/nredondo26/-U-L-T-R-O-N)
 
 </div>
