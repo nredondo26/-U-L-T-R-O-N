@@ -195,16 +195,22 @@ export class Orchestrator {
     while (t < this.config.maxSteps) {
       t++;
       try {
+        let streamBuf = '';
         const resp = await chatCompletion(
           { model: this.currentModel, messages: msgs, tools, tool_choice: 'auto', temperature: 0.7 },
-          c => { if (c.content) this.stream(c.content); },
+          c => {
+            if (!c.content) return;
+            streamBuf += c.content;
+            if (!looksLikeFunctionCallStart(streamBuf)) this.stream(c.content);
+          },
           ev => { this.currentModel = ev.to; },
         );
         if (resp.usage) this.configStore.addTokens(resp.usage.prompt_tokens, resp.usage.completion_tokens);
 
-        if (resp.tool_calls?.length) {
-          msgs.push({ role: 'assistant', content: resp.content, tool_calls: resp.tool_calls });
-          const results = await executeToolsParallel(resp.tool_calls, (n, a) => this.runTool(n, a));
+        const tcs = resp.tool_calls?.length ? resp.tool_calls : tryParseTextToolCalls(resp.content);
+        if (tcs?.length) {
+          msgs.push({ role: 'assistant', content: resp.content, tool_calls: tcs });
+          const results = await executeToolsParallel(tcs, (n, a) => this.runTool(n, a));
           for (const r of results) msgs.push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
         } else { out = resp.content || 'OK'; break; }
       } catch (e: unknown) {
@@ -305,4 +311,44 @@ export class Orchestrator {
       d('desktop_path', 'Devuelve la ruta del Escritorio', {}, []),
     ];
   }
+}
+
+function looksLikeFunctionCallStart(buf: string): boolean {
+  const t = buf.trimStart();
+  if (t.startsWith('{"type":"function"') || t.startsWith('{"type":"function"') || t.startsWith('[{"type":"function"')) return true;
+  if (t.startsWith('{') || t.startsWith('[')) {
+    try { const p = JSON.parse(t); return !!(p?.type === 'function' || (Array.isArray(p) && p[0]?.type === 'function')); } catch {}
+  }
+  return false;
+}
+
+function tryParseTextToolCalls(content: string | null): Array<{ id: string; type: string; function: { name: string; arguments: string } }> | null {
+  if (!content) return null;
+  const trimmed = content.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed.type === 'function' && parsed.name) {
+      return [{ id: 'fc_' + parsed.name, type: 'function', function: { name: parsed.name, arguments: JSON.stringify(parsed.parameters || {}) } }];
+    }
+    if (Array.isArray(parsed)) {
+      const tcs = parsed.filter(p => p.type === 'function' && p.name).map((p, i) => ({
+        id: 'fc_' + (p.name || i), type: 'function', function: { name: p.name, arguments: JSON.stringify(p.parameters || {}) }
+      }));
+      if (tcs.length) return tcs;
+    }
+  } catch {}
+  const singleMatch = trimmed.match(/\{"type"\s*:\s*"function"\s*,\s*"name"\s*:\s*"([^"]+)"\s*,\s*"parameters"\s*:\s*(\{[\s\S]*?\})\s*\}/);
+  if (singleMatch) {
+    try { const p = JSON.parse(singleMatch[2]); return [{ id: 'fc_' + singleMatch[1], type: 'function', function: { name: singleMatch[1], arguments: JSON.stringify(p) } }]; } catch {}
+  }
+  const arrayMatch = trimmed.match(/\[\s*\{[^]*?"type"\s*:\s*"function"[^]*?\}\s*\]/);
+  if (arrayMatch) {
+    try {
+      const arr = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(arr)) return arr.filter(p => p.type === 'function' && p.name).map((p, i) => ({
+        id: 'fc_' + (p.name || i), type: 'function', function: { name: p.name, arguments: JSON.stringify(p.parameters || {}) }
+      }));
+    } catch {}
+  }
+  return null;
 }
