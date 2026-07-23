@@ -43,7 +43,7 @@ function compressJson(output: string): string {
     const parsed = JSON.parse(output);
     const str = JSON.stringify(parsed);
     if (str.length < output.length * 0.6) return str;
-  } catch {}
+  } catch { /* not valid JSON */ }
   return output;
 }
 
@@ -76,7 +76,7 @@ function summarizeJsonArray(output: string): string {
       const keys = Object.keys(parsed);
       return `{${keys.length} keys}: ${keys.slice(0, 10).join(', ')}${keys.length > 10 ? `, ...` : ''}\n` + JSON.stringify(parsed, null, 2).slice(0, 300);
     }
-  } catch {}
+  } catch { /* not valid JSON */ }
   return output;
 }
 
