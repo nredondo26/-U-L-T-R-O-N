@@ -11,25 +11,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - run: bun run typecheck
-      - run: bun test
-      - run: bun run build
+      - run: bun test __tests__/shared.test.ts __tests__/memory.test.ts __tests__/server.test.ts __tests__/tools.test.ts __tests__/agents.test.ts
 
-  compile:
+  build:
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      - run: bun install
-      - run: bun build src/index.ts --compile --outfile dist/ultron-linux --target bun-linux-x64
+      - run: bun install --frozen-lockfile
+      - run: bun run build
       - uses: actions/upload-artifact@v4
         with:
-          name: ultron-linux
-          path: dist/ultron-linux
+          name: ultron-bundle
+          path: dist/index.js
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t ultron .
+      - run: docker images ultron

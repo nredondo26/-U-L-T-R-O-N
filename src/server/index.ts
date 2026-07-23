@@ -93,6 +93,12 @@ export function startWebServer(
     return req.socket.remoteAddress || 'unknown';
   }
 
+  function getRateLimitKey(req: IncomingMessage): string {
+    const auth = req.headers['authorization'] || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7).slice(0, 12) : 'anon';
+    return token + '|' + getClientIp(req);
+  }
+
   function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
     if (!apiKey) return true;
     const auth = req.headers['authorization'] || '';
@@ -116,13 +122,24 @@ export function startWebServer(
     applySecurityHeaders(req, res);
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+    if (req.url === '/healthz' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+      return;
+    }
+
+    if (req.url === '/metrics' && req.method === 'GET') {
+      handleMetrics(res);
+      return;
+    }
+
     if (req.url === '/api/auth' && req.method === 'POST') {
       handleAuth(req, res);
       return;
     }
 
     if (req.url?.startsWith('/api/')) {
-      const rl = rateLimiter.check(clientIp, req.url);
+      const rl = rateLimiter.check(getRateLimitKey(req), req.url);
       if (rl.limited) {
         res.writeHead(429, { 'Retry-After': String(Math.ceil((rl.reset - Date.now()) / 1000)), 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Demasiadas solicitudes. Intenta de nuevo en unos segundos.', retryAfter: Math.ceil((rl.reset - Date.now()) / 1000) }));
@@ -161,6 +178,10 @@ export function startWebServer(
     }
     if (req.url === '/api/router' && req.method === 'GET') {
       handleRouter(res);
+      return;
+    }
+    if (req.url === '/api/logs' && req.method === 'GET') {
+      handleLogs(req, res);
       return;
     }
     if (req.url === '/ws') {
@@ -373,6 +394,45 @@ export function startWebServer(
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Router not yet initialized' }));
     }
+  }
+
+  function handleLogs(req: IncomingMessage, res: ServerResponse) {
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const lines = parseInt(url.searchParams.get('lines') || '50', 10);
+    const { getRecentLogs } = require('../shared/logger');
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(getRecentLogs(Math.min(lines, 500)));
+  }
+
+  function handleMetrics(res: ServerResponse) {
+    const mem = process.memoryUsage();
+    let compB = 0, compA = 0;
+    try {
+      const { getStats } = require('../llm/compression/index');
+      const s = getStats();
+      compB = s.before; compA = s.after;
+    } catch { /* compression not initialized */ }
+    const metrics = [
+      '# HELP ultron_uptime_seconds Server uptime',
+      '# TYPE ultron_uptime_seconds gauge',
+      `ultron_uptime_seconds ${process.uptime()}`,
+      '# HELP ultron_memory_bytes Memory usage',
+      '# TYPE ultron_memory_bytes gauge',
+      `ultron_memory_rss_bytes ${mem.rss}`,
+      `ultron_memory_heap_bytes ${mem.heapUsed}`,
+      '# HELP ultron_http_requests_active Active HTTP requests',
+      '# TYPE ultron_http_requests_active gauge',
+      `ultron_http_requests_active ${activeRequests}`,
+      '# HELP ultron_sse_clients Active SSE connections',
+      '# TYPE ultron_sse_clients gauge',
+      `ultron_sse_clients ${SSE_CLIENTS.size}`,
+      '# HELP ultron_compression_bytes Token compression stats',
+      '# TYPE ultron_compression_bytes gauge',
+      `ultron_compression_bytes_before ${compB}`,
+      `ultron_compression_bytes_after ${compA}`,
+    ].join('\n');
+    res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
+    res.end(metrics + '\n');
   }
 
   function handleAgents(res: ServerResponse): void {

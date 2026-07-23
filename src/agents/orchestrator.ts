@@ -83,8 +83,17 @@ export class Orchestrator {
   private onEvent?: (event: AgentEvent) => void;
   private onStream?: (text: string) => void;
   private currentModel: string;
+  private agentModels: Map<string, string> = new Map();
   private agentStates: Map<string, { status: string; message: string; history: Array<{ time: string; text: string }>; lastActive: number }> = new Map();
   private activeController: AbortController | null = null;
+
+  setAgentModel(agentName: string, modelId: string): void {
+    this.agentModels.set(agentName.toLowerCase(), modelId);
+  }
+
+  getModelForAgent(agentName: string): string {
+    return this.agentModels.get(agentName.toLowerCase()) || this.currentModel;
+  }
 
   cancel(): void {
     if (this.activeController) {
@@ -137,6 +146,14 @@ export class Orchestrator {
     this.reviewer = new ReviewerAgent();
     this.architect = new ArchitectAgent();
     this.graphLearner = new GraphLearner(this.vault, config.projectDir);
+
+    // Per-agent model overrides from env: ULTRON_MODEL_EDITOR=qwen-coder-plus
+    for (const [k, v] of Object.entries(process.env)) {
+      if (v && k.startsWith('ULTRON_MODEL_')) {
+        const agent = k.replace('ULTRON_MODEL_', '').toLowerCase();
+        this.agentModels.set(agent, v);
+      }
+    }
 
     const saved = this.configStore.currentModel;
     this.currentModel = (saved && isModelHealthy(saved)) ? saved
