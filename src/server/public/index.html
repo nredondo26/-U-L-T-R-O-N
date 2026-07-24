@@ -142,6 +142,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
   <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
     <button class="header-btn" onclick="loadVoices()" style="width:100%;text-align:center">Reload voices</button>
   </div>
+  <h3 style="margin-top:14px">Proxy API</h3>
+  <label><span>Enable proxy (Claude Code / Codex)</span><input type="checkbox" id="setProxyEnabled" checked onchange="saveSettings()"></label>
+  <div class="setting-desc">Allows Claude Code and Codex CLI to connect to ULTRON</div>
+  <div style="font-size:9px;color:var(--dim);margin-top:4px;background:var(--bg);padding:8px;border-radius:var(--radius);font-family:var(--mono)">
+    Claude Code:<br>set ANTHROPIC_BASE_URL=http://127.0.0.1:3456<br>set ANTHROPIC_AUTH_TOKEN=ultron<br><br>
+    Codex CLI:<br>set OPENAI_BASE_URL=http://127.0.0.1:3456/v1<br>set OPENAI_API_KEY=ultron
+  </div>
+  <h3 style="margin-top:14px">Providers</h3>
+  <div id="providerList" style="font-size:10px;color:var(--dim)">Loading...</div>
 </div>
 <div class="header">
   <div class="header-left">
@@ -429,7 +438,7 @@ document.getElementById('input').focus();
 // === SETTINGS ===
 const DEFAULT_SETTINGS = {
   voiceEnabled: true, voice: 'default', volume: 80,
-  autoSpeak: false, soundFx: true
+  autoSpeak: false, soundFx: true, proxyEnabled: true
 };
 
 function loadSettings() {
@@ -446,6 +455,7 @@ function saveSettings() {
     volume: parseInt(document.getElementById('setVolume').value),
     autoSpeak: document.getElementById('setAutoSpeak').checked,
     soundFx: document.getElementById('setSoundFx').checked,
+    proxyEnabled: document.getElementById('setProxyEnabled').checked,
   };
   localStorage.setItem('ultron_settings', JSON.stringify(s));
   window._ultronSettings = s;
@@ -464,6 +474,33 @@ async function loadVoices() {
   } catch (e) { /* voice list load failed */ }
 }
 
+async function loadProviders() {
+  try {
+    const r = await apiFetch('/api/models');
+    if (!r.ok) return;
+    const d = await r.json();
+    const list = document.getElementById('providerList');
+    if (!d.models || !d.models.length) { list.innerHTML = 'No providers configured. Add API keys to .env'; return; }
+    const grouped = {};
+    for (const m of d.models) {
+      if (!grouped[m.provider]) grouped[m.provider] = [];
+      grouped[m.provider].push(m);
+    }
+    let html = '';
+    let totalHealthy = 0, totalModels = 0;
+    for (const [prov, models] of Object.entries(grouped)) {
+      const healthy = models.filter(m => m.healthy !== false).length;
+      totalHealthy += healthy; totalModels += models.length;
+      html += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">';
+      html += '<span>' + prov + '</span>';
+      html += '<span style="color:' + (healthy === models.length ? 'var(--success)' : healthy > 0 ? 'var(--warn)' : 'var(--error)') + '">' + healthy + '/' + models.length + '</span>';
+      html += '</div>';
+    }
+    html += '<div style="margin-top:4px;color:var(--dim)">' + totalHealthy + '/' + totalModels + ' modelos accesibles</div>';
+    list.innerHTML = html;
+  } catch (e) { /* provider list load failed */ }
+}
+
 // Init settings
 (function initSettings() {
   const s = loadSettings();
@@ -473,7 +510,8 @@ async function loadVoices() {
   document.getElementById('setVolume').value = s.volume;
   document.getElementById('setAutoSpeak').checked = s.autoSpeak;
   document.getElementById('setSoundFx').checked = s.soundFx;
-  // Close settings on click outside
+  document.getElementById('setProxyEnabled').checked = s.proxyEnabled !== false;
+  setTimeout(loadProviders, 500);
   document.addEventListener('click', (e) => {
     const panel = document.getElementById('settingsPanel');
     const btn = document.getElementById('settingsBtn');
