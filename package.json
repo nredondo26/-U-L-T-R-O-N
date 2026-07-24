@@ -24,6 +24,7 @@
     "compile": "bun build src/index.ts --compile --outfile dist/ultron.exe --target bun-windows-x64 && node scripts/set-icon.js && node scripts/copy-public.cjs",
     "compile:linux": "bun build src/index.ts --compile --outfile dist/ultron --target bun-linux-x64",
     "compile:node": "bun build src/index.ts --compile --outfile dist/ultron.exe --target node-windows-x64",
+    "desktop": "powershell -ExecutionPolicy Bypass -File electron/ultron-desktop.ps1",
     "clean": "rm -rf dist *.tsbuildinfo",
     "lint": "eslint src/",
     "format": "prettier --write src/",
