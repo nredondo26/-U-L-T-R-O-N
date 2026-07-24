@@ -15,6 +15,7 @@ import { getRouterInstance } from '../llm/chat';
 import { log } from '../shared/logger';
 import { RateLimiter } from './rate-limiter';
 import { applySecurityHeaders } from './security';
+import { handleOpenAIChat, handleOpenAIModels, handleAnthropicMessages } from './proxy';
 
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB
 const MAX_CONNECTIONS = 100;
@@ -123,6 +124,19 @@ export function startWebServer(
     res.on('finish', () => { activeRequests--; logReq(); });
     applySecurityHeaders(req, res);
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+    if (req.url === '/v1/chat/completions' && req.method === 'POST') {
+      handleOpenAIChat(req, res, orchestrator);
+      return;
+    }
+    if (req.url === '/v1/models' && req.method === 'GET') {
+      handleOpenAIModels(req, res, orchestrator);
+      return;
+    }
+    if (req.url === '/v1/messages' && req.method === 'POST') {
+      handleAnthropicMessages(req, res, orchestrator);
+      return;
+    }
 
     if (req.url === '/healthz' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -75,6 +75,74 @@ function buildBaseProviders(): LLMProvider[] {
     });
   }
 
+  if (process.env.GEMINI_API_KEY) {
+    providers.push({
+      name: 'gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: process.env.GEMINI_API_KEY,
+      defaultModel: 'gemini-2.5-flash',
+      models: [
+        M('gemini-2.5-flash', true), M('gemini-2.5-pro', true),
+        M('gemini-2.0-flash', true), M('gemini-2.0-flash-lite', true),
+      ],
+    });
+  }
+
+  if (process.env.GROQ_API_KEY) {
+    providers.push({
+      name: 'groq', baseURL: 'https://api.groq.com/openai/v1', apiKey: process.env.GROQ_API_KEY,
+      defaultModel: 'llama-3.3-70b-versatile',
+      models: [
+        M('llama-3.3-70b-versatile', true), M('llama-3.1-8b-instant', true),
+        M('mixtral-8x7b-32768', true), M('gemma2-9b-it', true),
+        M('deepseek-r1-distill-llama-70b', true),
+      ],
+    });
+  }
+
+  if (process.env.MISTRAL_API_KEY) {
+    providers.push({
+      name: 'mistral', baseURL: 'https://api.mistral.ai/v1', apiKey: process.env.MISTRAL_API_KEY,
+      defaultModel: 'mistral-small-latest',
+      models: [
+        M('mistral-small-latest', false), M('mistral-medium-latest', false),
+        M('mistral-large-latest', false), M('codestral-latest', false),
+      ],
+    });
+  }
+
+  if (process.env.COHERE_API_KEY) {
+    providers.push({
+      name: 'cohere', baseURL: 'https://api.cohere.com/v1', apiKey: process.env.COHERE_API_KEY,
+      defaultModel: 'command-r-plus',
+      models: [
+        M('command-r-plus', false), M('command-r', false),
+        M('command-a-03-2025', false),
+      ],
+    });
+  }
+
+  // Local providers
+  if (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST) {
+    const ollamaUrl = process.env.OLLAMA_BASE_URL || `http://${process.env.OLLAMA_HOST || 'localhost'}:11434/v1`;
+    providers.push({
+      name: 'ollama', baseURL: ollamaUrl, apiKey: 'ollama',
+      defaultModel: 'llama3.1',
+      models: [
+        M('llama3.1', true, 70), M('llama3.2', true, 60),
+        M('qwen3:14b', true, 75), M('qwen3-coder:14b', true, 85),
+        M('deepseek-r1:14b', true, 80), M('codellama:13b', true, 78),
+        M('mistral:7b', true, 65), M('gemma3:12b', true, 70),
+      ],
+    });
+  }
+
+  if (process.env.LM_STUDIO_BASE_URL) {
+    providers.push({
+      name: 'lmstudio', baseURL: process.env.LM_STUDIO_BASE_URL + '/v1', apiKey: 'lm-studio',
+      defaultModel: 'local-model',
+      models: [M('local-model', true, 70)],
+    });
+  }
+
   return providers;
 }
 
