@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ULTRON</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+:root{--bg:#1a1b1e;--sidebar-bg:#1e1f23;--surface:#25262b;--border:#2f3035;--hover:#2c2d31;--accent:#4c9aff;--accent-dim:rgba(76,154,255,.12);--text:#c9ccd3;--dim:#6b6e78;--bright:#e4e6ea;--success:#57d9a3;--warn:#f0c85a;--error:#f97083;--font:Inter,system-ui,-apple-system,sans-serif;--mono:'JetBrains Mono',monospace;--radius:4px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::selection{background:var(--accent-dim)}
+
+.header{display:flex;align-items:center;padding:0 12px;height:36px;background:var(--sidebar-bg);border-bottom:1px solid var(--border);gap:12px;flex-shrink:0;-webkit-app-region:drag}
+.header-left{display:flex;align-items:center;gap:10px;-webkit-app-region:no-drag}
+.logo{font-weight:600;font-size:12px;color:var(--text);letter-spacing:1px;font-family:var(--mono)}
+.logo span{color:var(--accent)}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0}
+.status-dot.connected{background:var(--success);box-shadow:0 0 4px var(--success)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px;-webkit-app-region:no-drag}
+.model-select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:3px 8px;font-size:11px;outline:none;cursor:pointer;font-family:var(--mono);font-weight:500}
+.model-select:focus{border-color:var(--accent)}
+.header-badge{font-size:10px;color:var(--dim);font-family:var(--mono);padding:2px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);white-space:nowrap}
+.header-btn{font-size:10px;color:var(--dim);cursor:pointer;padding:3px 10px;background:none;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);transition:all .15s;white-space:nowrap}
+.header-btn:hover{color:var(--text);background:var(--hover)}
+
+.main{display:flex;flex:1;overflow:hidden}
+
+.sidebar{width:240px;background:var(--sidebar-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-title{padding:8px 12px;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)}
+.sidebar-content{flex:1;overflow-y:auto;padding:4px;font-family:var(--mono);font-size:11px}
+.file-tree-item{padding:3px 8px;color:var(--dim);cursor:pointer;border-radius:var(--radius);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:all .1s}
+.file-tree-item:hover{background:var(--hover);color:var(--text)}
+.file-tree-item.folder{color:var(--accent)}
+
+.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.work-banner{display:none;align-items:center;justify-content:center;gap:6px;padding:4px 12px;background:var(--accent-dim);border-bottom:1px solid var(--border);height:24px;overflow:hidden}
+.work-banner.show{display:flex}
+.work-banner .work-item{font-size:12px;animation:workerWalk 3s linear infinite;position:absolute}
+@keyframes workerWalk{0%{left:-16px}100%{left:calc(100% + 16px)}}
+.work-banner .work-msg{font-size:10px;color:var(--accent);font-family:var(--mono)}
+
+.messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:2px}
+.msg{max-width:85%;padding:6px 12px;line-height:1.55;font-size:12.5px;animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}}
+.msg.user{align-self:flex-end;background:var(--accent-dim);color:var(--bright);border:1px solid rgba(76,154,255,.15);border-radius:8px 8px 2px 8px;font-family:var(--font)}
+.msg.assistant{align-self:flex-start;background:transparent;color:var(--text);border:none;padding:6px 4px;font-family:var(--font)}
+.msg.assistant code,.msg.user code{background:rgba(255,255,255,.06);padding:1px 5px;border-radius:3px;font-size:11.5px;font-family:var(--mono)}
+.msg.assistant pre,.msg.user pre{background:var(--surface);padding:10px 12px;border-radius:var(--radius);overflow-x:auto;margin:6px 0;font-size:11px;border:1px solid var(--border);font-family:var(--mono);line-height:1.45}
+.msg.system{align-self:center;font-size:10px;color:var(--dim);padding:2px 0;background:transparent;font-family:var(--mono)}
+.msg.tool{align-self:flex-start;font-size:10px;color:var(--dim);padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);margin:4px 0}
+.typing{display:flex;gap:3px;padding:4px 0;align-self:flex-start}
+.typing span{width:4px;height:4px;border-radius:50%;background:var(--dim);animation:dotBounce 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes dotBounce{0%,80%,100%{opacity:.3;transform:scale(.7)}40%{opacity:1;transform:scale(1)}}
+
+.input-wrap{display:flex;gap:8px;padding:8px 12px;background:var(--sidebar-bg);border-top:1px solid var(--border)}
+.input-wrap input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-size:12px;outline:none;font-family:var(--mono);transition:border-color .15s}
+.input-wrap input:focus{border-color:var(--accent)}
+.input-wrap input::placeholder{color:var(--dim)}
+.btn-group{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.send-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:0 14px;cursor:pointer;font-size:11px;font-weight:500;font-family:var(--mono);transition:opacity .15s;white-space:nowrap;height:30px;letter-spacing:.3px}
+.send-btn:hover{opacity:.85}
+.send-btn:disabled{opacity:.3;cursor:default}
+.stop-btn{background:transparent;color:var(--error);border:1px solid var(--error);border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:11px;font-family:var(--mono);white-space:nowrap;display:none;height:30px}
+.stop-btn:hover{background:rgba(249,112,131,.1)}
+
+.agent-panel{width:220px;background:var(--sidebar-bg);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.agent-panel-title{padding:8px 12px;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)}
+.agent-list{flex:1;overflow-y:auto;padding:4px}
+.agent-item{padding:6px 10px;border-radius:var(--radius);margin:1px 0;transition:all .15s;cursor:default;display:flex;align-items:center;gap:8px;font-size:11px}
+.agent-item:hover{background:var(--hover)}
+.agent-item.active{background:var(--accent-dim)}
+.agent-item .agent-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--dim)}
+.agent-item.active .agent-dot{background:var(--accent);animation:pulse 1s ease-in-out infinite}
+.agent-item.done .agent-dot{background:var(--success)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.agent-item .agent-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.agent-item.active .agent-label{color:var(--text)}
+.agent-item.done .agent-label{color:var(--success)}
+
+.status-bar{display:flex;align-items:center;padding:0 12px;height:22px;background:var(--sidebar-bg);border-top:1px solid var(--border);gap:16px;flex-shrink:0;font-size:10px;font-family:var(--mono);color:var(--dim)}
+.status-bar .bar-item{display:flex;align-items:center;gap:4px}
+.status-bar .bar-val{color:var(--text)}
+
+#validateBanner{display:none;position:fixed;top:36px;left:0;right:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--accent);padding:8px 16px;align-items:center;gap:12px}
+#validateBanner.show{display:flex}
+#validateBannerBar{flex:1;height:2px;background:var(--border);border-radius:2px;overflow:hidden}
+#validateBannerFill{height:100%;background:var(--accent);border-radius:2px;transition:width .2s;width:0%}
+#validateBannerLabel{font-size:10px;color:var(--text);font-family:var(--mono)}
+#validateBannerClose{font-size:12px;color:var(--dim);cursor:pointer;background:none;border:none}
+
+#authOverlay{display:none;position:fixed;inset:0;z-index:9999;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#authOverlay.show{display:flex}
+#authOverlay h2{font-size:16px;color:var(--text);font-weight:400;letter-spacing:4px;font-family:var(--mono);text-transform:uppercase}
+#authOverlay input{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;color:var(--text);font-size:12px;width:280px;outline:none;font-family:var(--mono);text-align:center}
+#authOverlay input:focus{border-color:var(--accent)}
+#authOverlay button{background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:8px 24px;font-size:11px;cursor:pointer;font-family:var(--mono);letter-spacing:.5px}
+#authOverlay .auth-error{color:var(--error);font-size:11px;display:none;font-family:var(--mono)}
+
+@media(max-width:768px){.sidebar,.agent-panel{display:none}.msg{max-width:95%}}
+</style>
+</head>
+<body>
+<div id="authOverlay"><h2>ULTRON</h2><input id="authInput" type="password" placeholder="Enter API key"><button id="authSubmit">Unlock</button><div class="auth-error" id="authError"></div></div>
+<div id="validateBanner">
+  <div id="validateBannerLabel">Validating models...</div>
+  <div id="validateBannerBar"><div id="validateBannerFill"></div></div>
+  <button id="validateBannerClose" onclick="document.getElementById('validateBanner').classList.remove('show')">&#x2715;</button>
+</div>
+<div class="header">
+  <div class="header-left">
+    <span class="logo"><span>U</span>LTRON</span>
+    <div class="status-dot" id="statusDot"></div>
+  </div>
+  <div class="header-right">
+    <span class="header-badge" id="headerStats"><span>0</span> tk</span>
+    <select class="model-select" id="modelSelect"><option>...</option></select>
+    <button class="header-btn" id="testBtn" onclick="testModels()">Test</button>
+  </div>
+</div>
+<div class="main">
+  <div class="sidebar" id="fileTree">
+    <div class="sidebar-title">Project</div>
+    <div class="sidebar-content" id="fileTreeContent"><div class="file-tree-item">loading...</div></div>
+  </div>
+  <div class="chat-panel">
+    <div class="work-banner" id="workBanner"><div class="work-msg" id="workMsg">Working...</div></div>
+    <div class="messages" id="messages"><div class="msg system" id="connectingMsg">Connecting...</div></div>
+    <div class="input-wrap">
+      <input id="input" placeholder="Type a message... (/help for commands)" autofocus>
+      <div class="btn-group">
+        <button class="stop-btn" id="stopBtn" onclick="stop()">Stop</button>
+        <button class="send-btn" id="sendBtn" onclick="send()">Send</button>
+      </div>
+    </div>
+  </div>
+  <div class="agent-panel" id="agentPanel">
+    <div class="agent-panel-title">Agents</div>
+    <div class="agent-list" id="agentList"></div>
+  </div>
+</div>
+<div class="status-bar">
+  <span class="bar-item">model <span class="bar-val" id="barModel">-</span></span>
+  <span class="bar-item">tokens <span class="bar-val" id="barTokens">0</span></span>
+  <span class="bar-item" style="margin-left:auto">v5.1</span>
+</div>
+
+<script>
+let authToken='';
+function apiFetch(url,opts={}){
+  const headers={...opts.headers||{}};
+  if(authToken)headers['Authorization']='Bearer '+authToken;
+  return fetch(url,{...opts,headers});
+}
+(async function initAuth(){
+  try{
+    const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'_check_'})});
+    const d=await r.json();
+    if(d.ok&&d.message)return;
+    const saved=localStorage.getItem('ultron_key');
+    if(saved){
+      const vr=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:saved})});
+      const vd=await vr.json();
+      if(vd.ok){authToken=saved;return}
+    }
+    document.getElementById('authOverlay').classList.add('show');
+    document.getElementById('authSubmit').onclick=async()=>{
+      const key=document.getElementById('authInput').value.trim();if(!key)return;
+      const ar=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+      const ad=await ar.json();
+      if(ad.ok){authToken=key;localStorage.setItem('ultron_key',key);document.getElementById('authOverlay').classList.remove('show')}
+      else{const err=document.getElementById('authError');err.style.display='block';err.textContent='Invalid key'}
+    };
+    document.getElementById('authInput').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('authSubmit').click()});
+  }catch(e){}
+})();
+
+document.getElementById('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+
+const agents=[
+  {id:'Orchestrator',name:'Cerebro',color:'#4c9aff'},
+  {id:'Architect',name:'Visión',color:'#f0c85a'},
+  {id:'Editor',name:'Artífice',color:'#57d9a3'},
+  {id:'Librarian',name:'Sabio',color:'#6ea8fe'},
+  {id:'Basher',name:'Ejecutor',color:'#c084fc'},
+  {id:'Researcher',name:'Explorador',color:'#4dabf7'},
+  {id:'Thinker',name:'Estratega',color:'#ff922b'},
+  {id:'Reviewer',name:'Juez',color:'#f783ac'},
+];
+
+let tokens=0,model='',isStreaming=false,streamMsg=null,currentController=null;
+const pendingQueue=[];
+const agentDoneTimers={};
+
+function renderAgentList(){
+  const list=document.getElementById('agentList');list.innerHTML='';
+  for(const a of agents){
+    const el=document.createElement('div');el.className='agent-item';el.id='agent-'+a.id;
+    el.innerHTML='<div class="agent-dot" style="background:'+a.color+'"></div><span class="agent-label">'+a.name+'</span>';
+    list.appendChild(el);
+  }
+}
+renderAgentList();
+
+function setAgentStatus(id,status,msg){
+  const el=document.getElementById('agent-'+id);if(!el)return;
+  if(agentDoneTimers[id]){clearTimeout(agentDoneTimers[id]);delete agentDoneTimers[id]}
+  if(status==='action'||status==='active'||status==='thought'){
+    el.className='agent-item active';
+    updateWorkBanner(true,msg);
+  }else if(status==='done'||status==='result'){
+    el.className='agent-item done';
+    agentDoneTimers[id]=setTimeout(()=>{el.className='agent-item';updateWorkBanner(false)},3000);
+    updateWorkBanner(false);
+  }else{el.className='agent-item'}
+}
+
+function updateWorkBanner(show,msg){
+  const banner=document.getElementById('workBanner');
+  const count=document.querySelectorAll('.agent-item.active').length;
+  if(show||count>0){
+    banner.classList.add('show');
+    document.getElementById('workMsg').textContent=msg||'Working...';
+  }else{banner.classList.remove('show')}
+}
+
+async function loadModels(){
+  try{
+    const r=await apiFetch('/api/models');const d=await r.json();
+    if(!d.models){setTimeout(loadModels,2000);return}
+    document.getElementById('connectingMsg').textContent='';
+    const sel=document.getElementById('modelSelect');sel.innerHTML='';
+    const providers={};
+    for(const m of d.models){
+      if(!providers[m.provider])providers[m.provider]=[];
+      providers[m.provider].push(m);
+    }
+    for(const[prov,models]of Object.entries(providers)){
+      const grp=document.createElement('optgroup');grp.label=prov;
+      for(const m of models){
+        const opt=document.createElement('option');opt.value=m.model;
+        opt.textContent=(m.free?'* ':'')+m.model.split('/').pop();
+        if(m.model===d.current)opt.selected=true;
+        grp.appendChild(opt);
+      }
+      sel.appendChild(grp);
+    }
+    model=d.current;updateStats();
+  }catch(e){document.getElementById('connectingMsg').textContent='Connection error'}
+}
+document.getElementById('modelSelect').addEventListener('change',e=>switchModel(e.target.value));
+loadModels();
+
+async function switchModel(modelId){
+  try{const r=await apiFetch('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:modelId})});const d=await r.json();model=d.current;updateStats()}catch(e){}
+}
+
+function updateStats(){
+  document.getElementById('headerStats').innerHTML='<span>'+tokens.toLocaleString()+'</span> tk';
+  document.getElementById('barModel').textContent=model||'?';
+  document.getElementById('barTokens').textContent=tokens.toLocaleString();
+}
+
+const es=new EventSource('/ws');
+es.addEventListener('validate',e=>{
+  try{
+    const d=JSON.parse(e.data);
+    const banner=document.getElementById('validateBanner');
+    const label=document.getElementById('validateBannerLabel');
+    const bar=document.getElementById('validateBannerFill');
+    if(d.type==='start'){banner.classList.add('show');label.textContent=d.message;bar.style.width='0%'}
+    else if(d.type==='progress'){bar.style.width=Math.round(d.done/d.total*100)+'%'}
+    else if(d.type==='done'){bar.style.width='100%';setTimeout(()=>banner.classList.remove('show'),3000)}
+  }catch(e){}
+});
+es.addEventListener('event',e=>{
+  try{const d=JSON.parse(e.data);if(d.type==='action'||d.type==='thought')setAgentStatus(d.agent,d.type,d.message);else if(d.type==='done')setAgentStatus(d.agent,'done','')}catch(e){}
+});
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function safeMD(t){return esc(t).replace(/```(\w+)?\n([\s\S]*?)```/g,'<pre><code>$2</code></pre>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>')}
+
+let streamRawText='';
+
+function stop(){
+  if(currentController){currentController.abort();currentController=null}
+}
+
+async function send(){
+  const input=document.getElementById('input');const text=input.value.trim();if(!text)return;
+  input.value='';
+  if(isStreaming){pendingQueue.push(text);addMessage(text,'user');return}
+  isStreaming=true;document.getElementById('sendBtn').disabled=true;document.getElementById('stopBtn').style.display='inline';
+  document.getElementById('statusDot').classList.add('connected');
+  addMessage(text,'user');showTyping(true);
+  await doSend(text);
+}
+async function doSend(text){
+  const controller=new AbortController();currentController=controller;streamRawText='';
+  const tm=setTimeout(()=>controller.abort(),180000);
+  try{
+    const resp=await apiFetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,model}),signal:controller.signal});clearTimeout(tm);
+    if(!resp.ok){showTyping(false);addMessage('Error: HTTP '+resp.status,'assistant');finishSend();return}
+    if(controller.signal.aborted){finishSend();return}
+    const reader=resp.body.getReader();const decoder=new TextDecoder();let leftover='',firstChunk=true;
+    try{
+      while(true){
+        const{done,value}=await reader.read();if(done)break;
+        if(controller.signal.aborted){reader.cancel();break}
+        leftover+=decoder.decode(value,{stream:true});
+        const lines=leftover.split('\n');leftover=lines.pop()||'';
+        for(const line of lines){
+          if(!line.trim())continue;
+          try{
+            const d=JSON.parse(line);
+            if(d.type==='init'){model=d.model;document.getElementById('statusDot').classList.add('connected');updateStats()}
+            else if(d.type==='stream'){
+              if(!streamMsg){streamMsg=addMessage('','assistant');showTyping(false);firstChunk=true}
+              if(firstChunk){streamRawText=d.content||'';firstChunk=false}else streamRawText+=d.content||'';
+              streamMsg.innerHTML=safeMD(streamRawText);streamMsg.scrollIntoView(false);
+            }else if(d.type==='event'&&d.data){
+              const ev=d.data;
+              if(ev.type==='action'){setAgentStatus(ev.agent,'action',ev.message);addToolMsg(ev.agent,ev.message)}
+              else if(ev.type==='done')setAgentStatus(ev.agent,'done','')
+              else if(ev.type==='thought')setAgentStatus(ev.agent,'thought',ev.message||'')
+            }else if(d.type==='result'){if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);tokens=d.tokens?.tokens||0;updateStats();streamMsg=null;streamRawText=''}
+            else if(d.type==='error'){showTyping(false);addMessage('Error: '+d.error,'assistant')}
+          }catch(e){}
+        }
+      }
+      if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);
+    }catch(e){
+      if(controller.signal.aborted)addMessage('Stopped','system');
+      else{showTyping(false);addMessage('Error: '+(e.message||'Connection lost'),'assistant')}
+    }
+  }catch(e){
+    clearTimeout(tm);
+    if(controller.signal.aborted)addMessage('Stopped','system');
+    else{showTyping(false);addMessage('Error: '+(e.message||'Failed to fetch'),'assistant')}
+  }
+  currentController=null;finishSend();
+}
+function finishSend(){
+  isStreaming=false;document.getElementById('sendBtn').disabled=false;document.getElementById('stopBtn').style.display='none';
+  document.getElementById('statusDot').classList.remove('connected');updateStats();
+  if(!currentController&&pendingQueue.length>0){
+    const next=pendingQueue.shift();isStreaming=true;
+    document.getElementById('sendBtn').disabled=true;document.getElementById('stopBtn').style.display='inline';
+    showTyping(true);doSend(next);
+  }
+}
+function addMessage(text,type){
+  const el=document.createElement('div');el.className='msg '+type;
+  el.innerHTML=safeMD(text);
+  document.getElementById('messages').appendChild(el);el.scrollIntoView(false);return el;
+}
+function addToolMsg(agent,msg){
+  const el=document.createElement('div');el.className='msg tool';
+  el.textContent=(msg||'').slice(0,100);
+  document.getElementById('messages').appendChild(el);
+}
+function showTyping(show){
+  const existing=document.getElementById('typing');
+  if(show&&!existing){
+    const d=document.createElement('div');d.id='typing';d.className='typing';
+    d.innerHTML='<span></span><span></span><span></span>';
+    document.getElementById('messages').appendChild(d);d.scrollIntoView(false);
+  }else if(!show&&existing)existing.remove();
+}
+
+async function testModels(){
+  document.getElementById('testBtn').textContent='...';
+  const input=document.getElementById('input');const was=input.value;
+  input.value='/test-models';document.getElementById('sendBtn').click();
+  input.value=was;setTimeout(()=>document.getElementById('testBtn').textContent='Test',3000);
+}
+
+// File tree
+async function loadFileTree(){
+  try{
+    const r=await apiFetch('/api/status');
+    if(!r.ok)return;
+    const tree=document.getElementById('fileTreeContent');
+    // Simple: just show a note about /index command
+    tree.innerHTML='<div class="file-tree-item folder">project/</div><div class="file-tree-item" style="padding-left:16px;color:var(--dim)">Usa /index para analizar</div><div class="file-tree-item" style="padding-left:16px;color:var(--dim)">@archivo para leer</div>';
+  }catch(e){}
+}
+setTimeout(loadFileTree,1000);
+
+document.getElementById('input').focus();
+</script>
+</body>
+</html>

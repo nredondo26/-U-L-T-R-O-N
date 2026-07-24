@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://127.0.0.1:3456",
     "beforeDevCommand": "",
-    "beforeBuildCommand": "node ../../scripts/copy-dist-for-desktop.cjs"
+    "beforeBuildCommand": ""
   },
   "app": {
     "windows": [
