@@ -1,0 +1,7 @@
+target/
+node_modules/
+bun.lock
+Cargo.lock
+gen/
+*.msi
+*.exe

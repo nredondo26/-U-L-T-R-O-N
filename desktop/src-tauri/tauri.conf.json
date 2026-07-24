@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://127.0.0.1:3456",
     "beforeDevCommand": "",
-    "beforeBuildCommand": ""
+    "beforeBuildCommand": "node ../../scripts/copy-dist-for-desktop.cjs"
   },
   "app": {
     "windows": [
@@ -40,6 +40,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "ultron.exe",
+      ".env",
+      "public/*"
     ],
     "windows": {
       "wix": {
