@@ -1,5 +1,5 @@
 // src/memory/vault.ts
-// Sistema de vault Obsidian: notas markdown con [[links]] y #tags
+// Sistema de vault Obsidian + Memoria estructurada Claude-style
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,6 +11,15 @@ const MAX_NOTES = 1000;
 const MAX_CONTEXT_NOTES = 50;
 const AUTO_CLEANUP_DAYS = 30;
 
+interface MemoryFile {
+  name: string;
+  description: string;
+  sources: string[];
+  aliases: string[];
+  content: string;
+  version: number;
+}
+
 export class ObsidianVault {
   private vaultDir: string;
 
@@ -19,6 +28,118 @@ export class ObsidianVault {
     ensureDir(vaultDir);
     this.cleanup();
   }
+
+  // ===== CLAUDE-STYLE STRUCTURED MEMORY =====
+
+  memoryWrite(filePath: string, frontmatter: { name: string; description: string; sources?: string[]; aliases?: string[] }, content: string): string {
+    const safePath = this.safeMemoryPath(filePath);
+    const yaml = [
+      '---',
+      `name: ${frontmatter.name}`,
+      `description: ${frontmatter.description}`,
+      `sources: [${(frontmatter.sources || ['chat']).join(', ')}]`,
+      ...(frontmatter.aliases?.length ? [`aliases: [${frontmatter.aliases.join(', ')}]`] : []),
+      '---',
+      '',
+      content,
+    ].join('\n');
+    ensureDir(path.dirname(safePath));
+    fs.writeFileSync(safePath, yaml, 'utf8');
+    return 'ok';
+  }
+
+  memoryAppend(filePath: string, fact: string): string {
+    const safePath = this.safeMemoryPath(filePath);
+    if (!fs.existsSync(safePath)) return 'error: file not found';
+    let content = fs.readFileSync(safePath, 'utf8');
+    if (content.includes(fact.trim())) return 'ok';
+    fs.appendFileSync(safePath, fact + '\n', 'utf8');
+    return 'ok';
+  }
+
+  memoryRead(filePath: string): MemoryFile | null {
+    const safePath = this.safeMemoryPath(filePath);
+    if (!fs.existsSync(safePath)) return null;
+    const raw = fs.readFileSync(safePath, 'utf8');
+    const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) {
+      return {
+        name: path.basename(filePath, '.md'),
+        description: '',
+        sources: ['chat'],
+        aliases: [],
+        content: raw,
+        version: 1,
+      };
+    }
+    const frontmatter: any = {};
+    for (const line of match[1].split('\n')) {
+      const [k, ...v] = line.split(': ');
+      if (k && v.length) {
+        const val = v.join(': ').trim();
+        if (val.startsWith('[')) frontmatter[k.trim()] = val.slice(1, -1).split(', ').filter(Boolean);
+        else frontmatter[k.trim()] = val;
+      }
+    }
+    return {
+      name: frontmatter.name || path.basename(filePath, '.md'),
+      description: frontmatter.description || '',
+      sources: frontmatter.sources || ['chat'],
+      aliases: frontmatter.aliases || [],
+      content: match[2].trim(),
+      version: 1,
+    };
+  }
+
+  memoryList(): Array<{ path: string; name: string; description: string; aliases: string[] }> {
+    const files: Array<{ path: string; name: string; description: string; aliases: string[] }> = [];
+    const scan = (dir: string, rel: string): void => {
+      try {
+        for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+          const relPath = rel ? rel + '/' + item.name : item.name;
+          if (item.isDirectory()) { scan(path.join(dir, item.name), relPath); }
+          else if (item.name.endsWith('.md')) {
+            const mem = this.memoryRead(relPath);
+            if (mem) {
+              files.push({ path: relPath, name: mem.name, description: mem.description, aliases: mem.aliases });
+            }
+          }
+        }
+      } catch { /* skip unreadable dir */ }
+    };
+    scan(this.vaultDir, '');
+    return files;
+  }
+
+  memoryDelete(filePath: string): string {
+    const safePath = this.safeMemoryPath(filePath);
+    if (fs.existsSync(safePath)) { fs.unlinkSync(safePath); return 'ok'; }
+    return 'error: not found';
+  }
+
+  buildMemoryContext(): string {
+    const files = this.memoryList();
+    if (files.length === 0) return '(memoria vacia)';
+    const profile = this.memoryRead('profile.md');
+    const prefs = this.memoryRead('preferences.md');
+    const recent = files.filter(f => !['profile.md', 'preferences.md'].includes(f.path)).slice(0, 30);
+
+    let ctx = '';
+    if (profile) ctx += `=== PERFIL ===\n${profile.content.slice(0, 500)}\n\n`;
+    if (prefs) ctx += `=== PREFERENCIAS ===\n${prefs.content.slice(0, 500)}\n\n`;
+    if (recent.length > 0) {
+      ctx += `=== MEMORIA ===\n${recent.length} archivos:\n`;
+      ctx += recent.map(f => `- ${f.path}: ${f.description}`).join('\n');
+    }
+    return ctx || '(memoria sin datos relevantes)';
+  }
+
+  private safeMemoryPath(filePath: string): string {
+    const safe = filePath.replace(/\.\./g, '').replace(/\\/g, '/');
+    return path.join(this.vaultDir, safe.endsWith('.md') ? safe : safe + '.md');
+  }
+
+  // ===== LEGACY VAULT (backward compat) =====
 
   private cleanup(): void {
     try {

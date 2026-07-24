@@ -15,7 +15,7 @@ export function buildSystemPrompt(
   projectDir: string,
   autoContext = '',
 ): string {
-  const vaultContext = vault.buildContext();
+  const vaultContext = vault.buildMemoryContext();
   const sessionContext = session.toPromptSummary(600);
   const projectTree = getQuickTree(projectDir);
   const stats = config.stats;

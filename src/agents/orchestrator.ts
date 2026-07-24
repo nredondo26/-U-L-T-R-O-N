@@ -20,8 +20,9 @@ import { buildSystemPrompt, buildSummarizePrompt } from './prompts';
 import { executeTool, executeToolsParallel } from './tools-executor';
 import { handleCommand, isSlashCommand } from './commands';
 import * as fileTools from '../tools/file';
-import { executeCommand } from '../tools/execute';
+    import { executeCommand } from '../tools/execute';
 import { sandboxedExec, getSandboxConfig, setSandboxMode, allowAll, addAllow } from '../tools/sandbox';
+import { filterPrivateInfo } from '../memory/privacy';
 import { log } from '../shared/logger';
 
 const SUMMARIZE_EVERY = 12;
@@ -294,6 +295,10 @@ export class Orchestrator {
 
     this.vault.autoSave('context', `User: ${input.slice(0, 200)}\n\nULTRON: ${out.slice(0, 500)}`);
     this.session.record('chat', input.slice(0, 100), out.slice(0, 200));
+
+    // Proactive memory: save profile if user reveals info about themselves
+    this.proactiveMemory(input);
+
     if (this.configStore.turnCount > 0 && this.configStore.turnCount % SUMMARIZE_EVERY === 0) this.autoSummary();
 
     this.emit({ type: 'done', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
@@ -314,7 +319,55 @@ export class Orchestrator {
     return msg;
   }
 
+  private proactiveMemory(input: string): void {
+    try {
+      const profile = this.vault.memoryRead('profile.md');
+      const nameMatch = input.match(/(?:me llamo|mi nombre es|soy|i am|my name is)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i);
+      const roleMatch = input.match(/(?:trabajo como|work as|i('?m| am) (?:an? )?)\s+([a-záéíóúñ\s]+(?:developer|engineer|designer|manager|programmer|coder|student|teacher|analyst|consultant))/i);
+      const prefMatch = input.match(/(?:prefiero|me gusta|i prefer|i like)\s+([^.,]+)/i);
+
+      if (!profile && (nameMatch || roleMatch)) {
+        let facts = '';
+        if (nameMatch) facts += `- [stated] nombre: ${nameMatch[1]}\n`;
+        if (roleMatch) facts += `- [stated] rol: ${roleMatch[2]}\n`;
+        this.vault.memoryWrite('profile.md', {
+          name: 'profile',
+          description: nameMatch ? `Perfil de ${nameMatch[1]}` : 'Perfil del usuario',
+        }, `# Perfil\n${facts}`);
+      } else if (prefMatch && profile && !profile.content.includes(prefMatch[1].trim())) {
+        const existing = this.vault.memoryRead('preferences.md');
+        this.vault.memoryWrite('preferences.md',
+          { name: 'preferences', description: 'Preferencias del usuario' },
+          (existing?.content || '# Preferencias\n') + `- [stated] ${prefMatch[1].trim()}\n`,
+        );
+      }
+    } catch { /* best-effort */ }
+  }
+
   private async runTool(name: string, args: Record<string, unknown>): Promise<{ result: string; retries: number }> {
+    // Handle memory tools directly
+    if (name === 'memory_write') {
+      const filtered = filterPrivateInfo(args.content as string || '');
+      const r = this.vault.memoryWrite(
+        args.path as string,
+        { name: args.name as string, description: args.description as string },
+        filtered,
+      );
+      return { result: r === 'ok' ? 'Memoria guardada: ' + args.path : r, retries: 0 };
+    }
+    if (name === 'memory_read') {
+      const r = this.vault.memoryRead(args.path as string);
+      return { result: r ? JSON.stringify(r) : '(archivo no encontrado)', retries: 0 };
+    }
+    if (name === 'memory_list') {
+      const files = this.vault.memoryList();
+      return { result: files.length > 0 ? files.map(f => `- ${f.path}: ${f.description}`).join('\n') : '(memoria vacia)', retries: 0 };
+    }
+    if (name === 'memory_delete') {
+      const r = this.vault.memoryDelete(args.path as string);
+      return { result: r === 'ok' ? 'Eliminado: ' + args.path : r, retries: 0 };
+    }
+
     const toolAgent = agentForTool(name);
     this.emit({ type: 'action', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args), data: args });
     log.tool(name, args, 'executing');
@@ -358,6 +411,10 @@ export class Orchestrator {
       d('browse_url', 'Abre URL en navegador', { url: { type: 'string' } }, ['url']),
       d('open_app', 'Abre aplicacion', { app: { type: 'string' } }, ['app']),
       d('analyze_document', 'Analiza documento (PDF, DOCX, XLSX, PPTX, EPUB, RTF, ZIP, Imagenes, Audio/Video, TXT, y 20+ formatos mas)', { filePath: { type: 'string' } }, ['filePath']),
+      d('memory_write', 'Guarda un dato en la memoria persistente (sistema Claude-style)', { path: { type: 'string', description: 'ruta del archivo (ej: profile.md, topics/comida.md)' }, name: { type: 'string' }, description: { type: 'string' }, content: { type: 'string' } }, ['path', 'name', 'description', 'content']),
+      d('memory_read', 'Lee un archivo de la memoria', { path: { type: 'string' } }, ['path']),
+      d('memory_list', 'Lista todos los archivos de la memoria', {}, []),
+      d('memory_delete', 'Elimina un archivo de la memoria (solo si el usuario lo pide)', { path: { type: 'string' } }, ['path']),
       d('run_lint', 'Ejecuta typecheck/lint', {}, []),
       d('speak', 'Habla texto en voz alta', { text: { type: 'string' }, voice: { type: 'string' } }, ['text']),
       d('mouse_click', 'Hace click del mouse (left/right)', { button: { type: 'string' } }, []),
