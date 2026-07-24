@@ -357,7 +357,7 @@ export class Orchestrator {
       d('str_replace', 'Reemplaza texto en archivo', { filePath: { type: 'string' }, oldStr: { type: 'string' }, newStr: { type: 'string' } }, ['filePath', 'oldStr', 'newStr']),
       d('browse_url', 'Abre URL en navegador', { url: { type: 'string' } }, ['url']),
       d('open_app', 'Abre aplicacion', { app: { type: 'string' } }, ['app']),
-      d('analyze_document', 'Analiza documento (PDF, DOCX, XLSX)', { filePath: { type: 'string' } }, ['filePath']),
+      d('analyze_document', 'Analiza documento (PDF, DOCX, XLSX, PPTX, EPUB, RTF, ZIP, Imagenes, Audio/Video, TXT, y 20+ formatos mas)', { filePath: { type: 'string' } }, ['filePath']),
       d('run_lint', 'Ejecuta typecheck/lint', {}, []),
       d('speak', 'Habla texto en voz alta', { text: { type: 'string' }, voice: { type: 'string' } }, ['text']),
       d('mouse_click', 'Hace click del mouse (left/right)', { button: { type: 'string' } }, []),

@@ -243,7 +243,14 @@ async function executeToolOnce(
     case 'analyze_document': {
       const result = await analyzeDocument(args.filePath as string);
       if (!result.success) return result.error || 'Error al analizar documento.';
-      return `[${result.fileType.toUpperCase()}] ${result.fileName} (${result.charCount.toLocaleString()} caracteres${result.pageCount ? `, ${result.pageCount} paginas` : ''}${result.sheetCount ? `, ${result.sheetCount} hojas` : ''})\n\n${result.content.slice(0, 8000)}`;
+      const meta = result.metadata ? ` — ${Math.round(result.metadata.size / 1024)}KB` : '';
+      const info = [
+        result.pageCount ? `${result.pageCount} paginas` : '',
+        result.sheetCount ? `${result.sheetCount} hojas` : '',
+        result.slideCount ? `${result.slideCount} diapositivas` : '',
+        result.charCount > 0 ? `${result.charCount.toLocaleString()} caracteres` : '',
+      ].filter(Boolean).join(', ');
+      return `[${result.fileType.toUpperCase()}] ${result.fileName}${meta}${info ? ` (${info})` : ''}\n\n${result.content.slice(0, 8000)}`;
     }
     default:
       return `Herramienta desconocida: ${name}`;
