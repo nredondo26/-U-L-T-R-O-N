@@ -25,6 +25,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .header-btn{font-size:10px;color:var(--dim);cursor:pointer;padding:3px 10px;background:none;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);transition:all .15s;white-space:nowrap}
 .header-btn:hover{color:var(--text);background:var(--hover)}
 
+/* Settings panel */
+#settingsPanel{display:none;position:fixed;top:36px;right:8px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;width:300px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+#settingsPanel.show{display:block}
+#settingsPanel h3{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;font-family:var(--mono)}
+#settingsPanel label{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:11px;color:var(--text);cursor:pointer}
+#settingsPanel .setting-desc{font-size:9px;color:var(--dim);margin-top:-4px;margin-bottom:8px}
+#settingsPanel select,#settingsPanel input[type=range]{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:4px 8px;font-size:10px;font-family:var(--mono);width:100%}
+#settingsPanel input[type=checkbox]{appearance:none;width:32px;height:18px;background:var(--border);border-radius:10px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+#settingsPanel input[type=checkbox]::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dim);transition:all .2s}
+#settingsPanel input[type=checkbox]:checked{background:var(--accent)}
+#settingsPanel input[type=checkbox]:checked::after{left:16px;background:#fff}
+#settingsPanel .setting-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0}
+
 .main{display:flex;flex:1;overflow:hidden}
 
 .sidebar{width:240px;background:var(--sidebar-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
@@ -110,6 +123,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
   <div id="validateBannerBar"><div id="validateBannerFill"></div></div>
   <button id="validateBannerClose" onclick="document.getElementById('validateBanner').classList.remove('show')">&#x2715;</button>
 </div>
+<div id="settingsPanel">
+  <h3>Settings</h3>
+  <label><span>Voice (TTS)</span><input type="checkbox" id="setVoiceEnabled" checked onchange="saveSettings()"></label>
+  <div class="setting-desc">Enable text-to-speech when using /say command</div>
+  <div class="setting-row">
+    <span style="font-size:10px;color:var(--dim)">Voice</span>
+    <select id="setVoice" onchange="saveSettings()"><option>default</option></select>
+  </div>
+  <div class="setting-row">
+    <span style="font-size:10px;color:var(--dim)">Volume</span>
+    <input type="range" id="setVolume" min="0" max="100" value="80" onchange="saveSettings()">
+  </div>
+  <label><span>Auto-speak responses</span><input type="checkbox" id="setAutoSpeak" onchange="saveSettings()"></label>
+  <div class="setting-desc">Automatically speak ULTRON's responses</div>
+  <label><span>Sound effects</span><input type="checkbox" id="setSoundFx" checked onchange="saveSettings()"></label>
+  <div class="setting-desc">Play sounds when agents start/complete tasks</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+    <button class="header-btn" onclick="loadVoices()" style="width:100%;text-align:center">Reload voices</button>
+  </div>
+</div>
 <div class="header">
   <div class="header-left">
     <span class="logo"><span>U</span>LTRON</span>
@@ -119,6 +152,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
     <span class="header-badge" id="headerStats"><span>0</span> tk</span>
     <select class="model-select" id="modelSelect"><option>...</option></select>
     <button class="header-btn" id="testBtn" onclick="testModels()">Test</button>
+    <button class="header-btn" id="settingsBtn" onclick="toggleSettings()" title="Settings">&#x2699;</button>
   </div>
 </div>
 <div class="main">
@@ -391,6 +425,63 @@ async function loadFileTree(){
 setTimeout(loadFileTree,1000);
 
 document.getElementById('input').focus();
+
+// === SETTINGS ===
+const DEFAULT_SETTINGS = {
+  voiceEnabled: true, voice: 'default', volume: 80,
+  autoSpeak: false, soundFx: true
+};
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ultron_settings') || '{}');
+    return { ...DEFAULT_SETTINGS, ...s };
+  } catch { return { ...DEFAULT_SETTINGS }; }
+}
+
+function saveSettings() {
+  const s = {
+    voiceEnabled: document.getElementById('setVoiceEnabled').checked,
+    voice: document.getElementById('setVoice').value,
+    volume: parseInt(document.getElementById('setVolume').value),
+    autoSpeak: document.getElementById('setAutoSpeak').checked,
+    soundFx: document.getElementById('setSoundFx').checked,
+  };
+  localStorage.setItem('ultron_settings', JSON.stringify(s));
+  window._ultronSettings = s;
+}
+
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('show');
+}
+
+async function loadVoices() {
+  try {
+    const r = await apiFetch('/api/status');
+    if (!r.ok) return;
+    const sel = document.getElementById('setVoice');
+    sel.innerHTML = '<option>default</option><option>es-ES</option><option>en-US</option><option>custom</option>';
+  } catch (e) { /* voice list load failed */ }
+}
+
+// Init settings
+(function initSettings() {
+  const s = loadSettings();
+  window._ultronSettings = s;
+  document.getElementById('setVoiceEnabled').checked = s.voiceEnabled;
+  document.getElementById('setVoice').value = s.voice;
+  document.getElementById('setVolume').value = s.volume;
+  document.getElementById('setAutoSpeak').checked = s.autoSpeak;
+  document.getElementById('setSoundFx').checked = s.soundFx;
+  // Close settings on click outside
+  document.addEventListener('click', (e) => {
+    const panel = document.getElementById('settingsPanel');
+    const btn = document.getElementById('settingsBtn');
+    if (panel.classList.contains('show') && !panel.contains(e.target) && e.target !== btn) {
+      panel.classList.remove('show');
+    }
+  });
+})();
 </script>
 </body>
 </html>
