@@ -5,3 +5,6 @@ Cargo.lock
 gen/
 *.msi
 *.exe
+public/
+ultron.exe
+.env
