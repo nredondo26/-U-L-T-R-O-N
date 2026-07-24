@@ -79,7 +79,10 @@ export async function analyzeDocument(filePath: string): Promise<DocumentResult>
       case '.c': case '.cpp': case '.h': case '.hpp': case '.cs': case '.java':
       case '.go': case '.rs': case '.rb': case '.php': case '.swift': case '.kt':
       case '.dart': case '.lua': case '.r': case '.scala': case '.clj':
-      case '.dockerfile': case '.makefile': case '.cmake':
+      case '.vue': case '.svelte': case '.elm': case '.ex': case '.exs': case '.erl':
+      case '.hs': case '.ml': case '.mli': case '.nim': case '.zig': case '.tf':
+      case '.groovy': case '.jl': case '.fs': case '.fsx': case '.pl': case '.pm':
+      case '.dockerfile': case '.makefile': case '.cmake': case '.justfile':
         result = analyzeText(filePath, fileName, ext); break;
       // Fallback: intentar como texto
       default:
