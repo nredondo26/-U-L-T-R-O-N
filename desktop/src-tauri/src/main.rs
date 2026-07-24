@@ -29,7 +29,7 @@ fn find_ultron(app_handle: &tauri::AppHandle) -> Option<String> {
 
 fn start_server(path: &str) -> Option<Child> {
     let child = Command::new(path)
-        .args(["--web", "--port", "3456", "--bind", "127.0.0.1"])
+        .args(["--serve", "--port", "3456", "--bind", "127.0.0.1"])
         .spawn()
         .ok()?;
     Some(child)
