@@ -7,6 +7,9 @@ import * as path from 'path';
 import * as zlib from 'zlib';
 
 const MAX_CONTENT = 50000;
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const ANALYSIS_TIMEOUT = 30000; // 30 segundos
+const MAX_ZIP_SCAN = 50 * 1024 * 1024; // 50MB max para escanear ZIP
 
 export interface DocumentResult {
   success: boolean;
@@ -31,6 +34,16 @@ export async function analyzeDocument(filePath: string): Promise<DocumentResult>
   }
 
   const stat = fs.statSync(filePath);
+
+  if (stat.size > MAX_FILE_SIZE) {
+    const sizeMB = Math.round(stat.size / 1024 / 1024);
+    return {
+      success: false, content: '', fileType: ext, fileName, charCount: 0,
+      metadata: { size: stat.size, modified: stat.mtime.toISOString(), mime: getMimeType(ext) },
+      error: `Archivo demasiado grande (${sizeMB}MB). Limite: ${MAX_FILE_SIZE / 1024 / 1024}MB.`,
+    };
+  }
+
   const meta = {
     size: stat.size,
     modified: stat.mtime.toISOString(),
@@ -39,6 +52,7 @@ export async function analyzeDocument(filePath: string): Promise<DocumentResult>
 
   try {
     let result: DocumentResult;
+    const analysis = (async () => {
     switch (ext) {
       // Documentos
       case '.pdf': result = await analyzePDF(filePath, fileName); break;
@@ -100,6 +114,13 @@ export async function analyzeDocument(filePath: string): Promise<DocumentResult>
     }
     result.metadata = meta;
     return result;
+    })();
+
+    const timeout = new Promise<DocumentResult>((_, reject) =>
+      setTimeout(() => reject(new Error(`Analisis excedio ${ANALYSIS_TIMEOUT / 1000}s de timeout`)), ANALYSIS_TIMEOUT)
+    );
+
+    return await Promise.race([analysis, timeout]);
   } catch (e: unknown) {
     return {
       success: false, content: '', fileType: ext, fileName, charCount: 0,
@@ -329,6 +350,7 @@ function extractPrintable(content: string): string {
 // ZIP-based format helpers (PPTX, DOCX, EPUB, ODT, XLSX are all ZIP files)
 function extractZipXmlText(zipPath: string, xmlPath: string): string {
   try {
+    if (fs.statSync(zipPath).size > MAX_ZIP_SCAN) return '';
     const raw = fs.readFileSync(zipPath);
     const { centralDirOffset, entries } = readZipDirectory(raw);
     for (const entry of entries) {
@@ -347,17 +369,17 @@ function extractZipXmlText(zipPath: string, xmlPath: string): string {
 }
 
 function readZipDirectory(buf: Buffer): { centralDirOffset: number; entries: Array<{ name: string; method: number; compressedSize: number; dataOffset: number }> } {
-  // Find end of central directory
   let eocdOffset = buf.length - 22;
   while (eocdOffset > 0 && buf.readUInt32LE(eocdOffset) !== 0x06054b50) eocdOffset--;
   if (eocdOffset <= 0) return { centralDirOffset: 0, entries: [] };
 
   const cdOffset = buf.readUInt32LE(eocdOffset + 16);
   const cdSize = buf.readUInt32LE(eocdOffset + 12);
+  const MAX_ENTRIES = 500;
   let pos = cdOffset;
   const entries: Array<{ name: string; method: number; compressedSize: number; dataOffset: number }> = [];
 
-  while (pos < cdOffset + cdSize) {
+  while (pos < cdOffset + cdSize && entries.length < MAX_ENTRIES) {
     if (buf.readUInt32LE(pos) !== 0x02014b50) break;
     const method = buf.readUInt16LE(pos + 10);
     const compressedSize = buf.readUInt32LE(pos + 20);
@@ -384,6 +406,7 @@ function readZipDirectory(buf: Buffer): { centralDirOffset: number; entries: Arr
 
 function extractZipSlides(zipPath: string): string[] {
   try {
+    if (fs.statSync(zipPath).size > MAX_ZIP_SCAN) return [];
     const raw = fs.readFileSync(zipPath);
     const { entries } = readZipDirectory(raw);
     const slideFiles = entries
@@ -408,6 +431,7 @@ function extractZipSlides(zipPath: string): string[] {
 
 function extractEpubChapters(epubPath: string): string[] {
   try {
+    if (fs.statSync(epubPath).size > MAX_ZIP_SCAN) return [];
     const raw = fs.readFileSync(epubPath);
     const { entries } = readZipDirectory(raw);
     const htmlFiles = entries.filter(e => e.name.endsWith('.html') || e.name.endsWith('.xhtml') || e.name.endsWith('.htm'));
@@ -425,6 +449,7 @@ function extractEpubChapters(epubPath: string): string[] {
 
 function listZipContents(zipPath: string): string {
   try {
+    if (fs.statSync(zipPath).size > MAX_ZIP_SCAN) return `[ZIP] Archivo muy grande (${Math.round(fs.statSync(zipPath).size / 1024 / 1024)}MB) — no se puede listar.`;
     const raw = fs.readFileSync(zipPath);
     const { entries } = readZipDirectory(raw);
     if (entries.length === 0) return '(archivo ZIP vacio o corrupto)';
