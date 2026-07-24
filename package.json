@@ -25,6 +25,8 @@
     "compile:linux": "bun build src/index.ts --compile --outfile dist/ultron --target bun-linux-x64",
     "compile:node": "bun build src/index.ts --compile --outfile dist/ultron.exe --target node-windows-x64",
     "desktop": "powershell -ExecutionPolicy Bypass -File electron/ultron-desktop.ps1",
+    "desktop:setup": "cd desktop && bun install && npx tauri init",
+    "desktop:build": "bun run compile && node scripts/generate-icons.cjs && cd desktop && bun run tauri build",
     "clean": "rm -rf dist *.tsbuildinfo",
     "lint": "eslint src/",
     "format": "prettier --write src/",
