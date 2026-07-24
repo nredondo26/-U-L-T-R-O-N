@@ -77,8 +77,8 @@ Desktop app: Use ULTRON Desktop installer (MSI/NSIS)
   const orch = new Orchestrator({ projectDir, vaultDir, maxSteps: 25, verbose: !startServer });
 
   if (startServer) {
-    startWebServer(orch, { port: servePort, bindAddr, trustProxy, apiKey });
-    console.log(`Server running on http://${bindAddr === '0.0.0.0' ? 'localhost' : bindAddr}:${servePort}`);
+    startWebServer(orch, { port: servePort, bindAddr, trustProxy, apiKey, noBrowser: true });
+    console.log(`[serve] http://127.0.0.1:${servePort}`);
     return;
   }
 

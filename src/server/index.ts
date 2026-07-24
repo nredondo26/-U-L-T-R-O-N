@@ -24,6 +24,7 @@ export interface ServerConfig {
   bindAddr?: string;
   trustProxy?: boolean;
   apiKey?: string;
+  noBrowser?: boolean;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,6 +67,7 @@ export function startWebServer(
   const bindAddr = config.bindAddr || '127.0.0.1';
   const trustProxy = config.trustProxy || false;
   const apiKey = config.apiKey || '';
+  const noBrowser = config.noBrowser || false;
 
   if (apiKey) {
     console.log(`  \u{1f512} Auth enabled — API key required for web access`);
@@ -213,10 +215,12 @@ export function startWebServer(
   server.listen(port, bindAddr, () => {
     const url = `http://${bindAddr === '0.0.0.0' ? 'localhost' : bindAddr}:${port}`;
     console.log(`\n  Dashboard: ${url}\n`);
-    try {
-      const cmd = process.platform === 'win32' ? `start ${url}` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`;
-      child_process.exec(cmd);
-    } catch { /* browser launch failed, server still running */ }
+    if (!noBrowser) {
+      try {
+        const cmd = process.platform === 'win32' ? `start ${url}` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`;
+        child_process.exec(cmd);
+      } catch { /* browser launch failed, server still running */ }
+    }
     validateAllModels(broadcast).catch((err: unknown) => {
       log.error('Model validation failed', { error: err instanceof Error ? err.message : String(err) });
     });

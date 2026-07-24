@@ -28,10 +28,17 @@ fn find_ultron(app_handle: &tauri::AppHandle) -> Option<String> {
 }
 
 fn start_server(path: &str) -> Option<Child> {
-    let child = Command::new(path)
-        .args(["--serve", "--port", "3456", "--bind", "127.0.0.1"])
-        .spawn()
-        .ok()?;
+    let mut cmd = Command::new(path);
+    cmd.args(["--serve", "--port", "3456", "--bind", "127.0.0.1"]);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let child = cmd.spawn().ok()?;
     Some(child)
 }
 
