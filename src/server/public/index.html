@@ -367,6 +367,19 @@ async function switchSession(id) {
     tokens = 0;
     updateStats();
     loadSessions();
+    // Load conversation history for this session
+    const convR = await apiFetch('/api/sessions/conversation?id=' + encodeURIComponent(id));
+    if (convR.ok) {
+      const convD = await convR.json();
+      if (convD.conversation && convD.conversation.length > 0) {
+        for (const msg of convD.conversation) {
+          addMessage(msg.content || '', msg.role);
+        }
+        const meta = document.createElement('div'); meta.className = 'msg system';
+        meta.textContent = 'Session: ' + (convD.session?.name || id.slice(0,12));
+        document.getElementById('messages').appendChild(meta);
+      }
+    }
   } catch (e) { addMessage('Session switch failed','system'); }
 }
 
@@ -375,25 +388,27 @@ async function createSession() {
     const r = await apiFetch('/api/sessions/new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Session ' + Date.now() }),
+      body: JSON.stringify({ name: 'New chat' }),
     });
     if (!r.ok) { addMessage('Error creating session','system'); return; }
     const d = await r.json();
-    document.getElementById('messages').innerHTML = '<div class="msg system">New session created</div>';
+    document.getElementById('messages').innerHTML = '<div class="msg system">New session — start typing</div>';
     currentSessionId = d.session?.id || '';
     tokens = 0;
     updateStats();
     loadSessions();
-    // Auto-rename
-    const newName = prompt('Session name:', d.session?.name || 'New session');
-    if (newName) {
-      await apiFetch('/api/sessions/rename', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: currentSessionId, name: newName }),
-      });
-      loadSessions();
-    }
   } catch (e) { addMessage('Session creation failed','system'); }
+}
+
+function updateSessionName(msg) {
+  const name = msg.trim().slice(0, 60);
+  if (name.length > 3 && currentSessionId) {
+    apiFetch('/api/sessions/auto-name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: currentSessionId, message: name }),
+    }).then(() => loadSessions()).catch(() => {});
+  }
 }
 
 async function deleteSession(id) {
@@ -513,6 +528,7 @@ async function send(){
   isStreaming=true;document.getElementById('sendBtn').disabled=true;document.getElementById('stopBtn').style.display='inline';
   document.getElementById('statusDot').classList.add('connected');
   addMessage(text,'user');showTyping(true);
+  updateSessionName(text);
   await doSend(text);
 }
 async function doSend(text){
@@ -563,11 +579,23 @@ async function doSend(text){
 function finishSend(){
   isStreaming=false;document.getElementById('sendBtn').disabled=false;document.getElementById('stopBtn').style.display='none';
   document.getElementById('statusDot').classList.remove('connected');updateStats();
+  if(streamMsg){playChime();streamMsg=null;streamRawText=''}
   if(!currentController&&pendingQueue.length>0){
     const next=pendingQueue.shift();isStreaming=true;
     document.getElementById('sendBtn').disabled=true;document.getElementById('stopBtn').style.display='inline';
     showTyping(true);doSend(next);
   }
+}
+
+function playChime(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const g=ctx.createGain();g.connect(ctx.destination);g.gain.value=0.08;
+    const o=ctx.createOscillator();o.type='sine';o.connect(g);
+    o.frequency.setValueAtTime(880,ctx.currentTime);
+    o.frequency.setValueAtTime(1108,ctx.currentTime+0.08);
+    o.start(ctx.currentTime);o.stop(ctx.currentTime+0.15);
+  }catch(e){}
 }
 function addMessage(text,type){
   const el=document.createElement('div');el.className='msg '+type;

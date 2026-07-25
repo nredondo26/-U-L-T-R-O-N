@@ -233,6 +233,7 @@ export async function runCLI(options: {
     try {
       const r = await orch.handleMessage(input);
       stopSpinner();
+      process.stdout.write('\x07');
       if (!wasStreamed) process.stdout.write(formatResponse(r) + '\n');
     } catch (e: unknown) {
       stopSpinner();

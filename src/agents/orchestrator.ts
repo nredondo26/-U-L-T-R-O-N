@@ -158,6 +158,16 @@ export class Orchestrator {
   getUltronConfig(): UltronConfigStore { return this.ultronConfig; }
   getSessionManager(): SessionManager { return this.sessionManager; }
 
+  saveCurrentConversation(): void {
+    const activeId = this.sessionManager.getActiveId();
+    this.sessionManager.saveConversation(activeId, this.conversation);
+  }
+
+  loadConversationForSession(sessionId: string): void {
+    const conv = this.sessionManager.getConversation(sessionId);
+    this.conversation = conv;
+  }
+
   constructor(config: OrchestratorConfig) {
     this.config = config;
     this.vault = new ObsidianVault(config.vaultDir);
