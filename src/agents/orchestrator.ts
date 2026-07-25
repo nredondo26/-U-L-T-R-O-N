@@ -199,10 +199,16 @@ export class Orchestrator {
     this.currentModel = (saved && isModelHealthy(saved)) ? saved
       : getHealthyModelList()[0]?.model || getProviders()[0]?.defaultModel || 'deepseek-chat';
 
-    this.conversation = (this.configStore.chatHistory || [])
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .map(m => ({ role: m.role as 'user' | 'assistant', content: (m.content || '').slice(0, 2000) }))
-      .slice(-6);
+    this.conversation = this.sessionManager.getConversation(this.sessionManager.getActiveId())
+      || (this.configStore.chatHistory || [])
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: (m.content || '').slice(0, 2000) }))
+        .slice(-6);
+    // Set session model if available
+    const sessModel = this.sessionManager.getSessionModel(this.sessionManager.getActiveId());
+    if (sessModel && getAllModels().some(m => m.model === sessModel)) {
+      this.currentModel = sessModel;
+    }
 
     this.vaultInit();
     log.info('Orchestrator initialized', { model: this.currentModel, projectDir: config.projectDir, historyMsgs: this.conversation.length });
@@ -415,6 +421,7 @@ export class Orchestrator {
     if (this.conversation.length > 10) this.conversation = this.conversation.slice(-10);
     this.configStore.setChatHistory(this.conversation);
 
+    this.sessionManager.saveConversation(this.sessionManager.getActiveId(), this.conversation);
     this.sessionManager.recordMessage(this.sessionManager.getActiveId(), 'user', input);
     this.sessionManager.recordMessage(this.sessionManager.getActiveId(), 'assistant', out);
 
@@ -532,9 +539,18 @@ export class Orchestrator {
         const id = args.id as string;
         const found = sm.listSessions().find(s => s.id.startsWith(id) || s.id === id);
         if (!found) return { result: `Sesion no encontrada: ${id}. Usa session_list para ver IDs.`, retries: 0 };
+        // Save current conversation to current session
+        const currentId = sm.getActiveId();
+        sm.saveConversation(currentId, this.conversation);
+        // Switch session
         sm.switchSession(found.id);
-        this.conversation = [];
         this.session = sm.getActive();
+        this.conversation = sm.getConversation(found.id);
+        // Restore model for this session
+        const sessionModel = sm.getSessionModel(found.id);
+        if (sessionModel && getAllModels().some(m => m.model === sessionModel)) {
+          this.currentModel = sessionModel;
+        }
         return { result: `Sesion cambiada a: ${found.name} (${found.id.slice(0, 12)}...)`, retries: 0 };
       }
       case 'session_rename': {
@@ -542,15 +558,23 @@ export class Orchestrator {
         return { result: ok ? `Sesion renombrada a: ${args.name}` : 'Sesion no encontrada.', retries: 0 };
       }
       case 'session_delete': {
-        const ok = sm.deleteSession(args.id as string);
-        if (ok && sm.getActiveId() !== this.sessionManager.getActiveId()) {
+        const delId = args.id as string;
+        const isActive = delId === sm.getActiveId();
+        // Save current conversation first
+        if (isActive) sm.saveConversation(sm.getActiveId(), this.conversation);
+        const ok = sm.deleteSession(delId);
+        if (ok && isActive) {
           this.session = sm.getActive();
-          this.conversation = [];
+          this.conversation = sm.getConversation(sm.getActiveId());
         }
         return { result: ok ? 'Sesion eliminada.' : 'No se pudo eliminar (minimo 1 sesion).', retries: 0 };
       }
       case 'session_new': {
-        const newId = sm.createSession(args.name as string, args.model as string || this.currentModel);
+        // Save current conversation first
+        const currentId = sm.getActiveId();
+        sm.saveConversation(currentId, this.conversation);
+        // Create new session
+        const newId = sm.createSession(args.name as string, this.currentModel);
         sm.switchSession(newId);
         this.session = sm.getActive();
         this.conversation = [];

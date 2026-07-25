@@ -13,6 +13,7 @@ export interface SessionMeta {
   model: string;
   summary: string;
   tags: string[];
+  conversation: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export class SessionManager {
@@ -73,6 +74,7 @@ export class SessionManager {
       model: model || '',
       summary: '',
       tags: [],
+      conversation: [],
     };
     this.sessions.set(id, meta);
     this.saveIndex();
@@ -149,6 +151,23 @@ export class SessionManager {
       meta.summary = content.slice(0, 100);
     }
     this.saveIndex();
+  }
+
+  saveConversation(id: string, conversation: Array<{ role: 'user' | 'assistant'; content: string }>): void {
+    const meta = this.sessions.get(id);
+    if (!meta) return;
+    meta.conversation = conversation.slice(-20);
+    meta.messageCount = conversation.length;
+    meta.updatedAt = Date.now();
+    this.saveIndex();
+  }
+
+  getConversation(id: string): Array<{ role: 'user' | 'assistant'; content: string }> {
+    return this.sessions.get(id)?.conversation || [];
+  }
+
+  getSessionModel(id: string): string {
+    return this.sessions.get(id)?.model || '';
   }
 
   totalSessions(): number {
