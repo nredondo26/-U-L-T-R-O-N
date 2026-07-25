@@ -66,7 +66,28 @@ export async function handleCommand(
       return { response: 'Testing todos los modelos...', action: { type: 'testModels', command: args, cwd: projectDir } };
     }
     case 'graph': {
-      return { response: `Grafo de conocimiento:\n${vault.getGraph().nodes.length} nodos, ${vault.getGraph().edges.length} conexiones\nUsa /vault para ver notas.` };
+      return { response: `Grafo de conocimiento:\n${vault.getGraph().nodes.length} nodos, ${vault.getGraph().edges.length} conexiones\nUsa /vault para ver notas.\nPara grafo avanzado (AST): /graph-build, /graph-search, /graph-overview` };
+    }
+    case 'graph-build':
+      return { response: 'Construyendo grafo avanzado... (usa graph_build en el chat para integracion completa)' };
+    case 'graph-search':
+      return { response: `Busca en el grafo: usa "graph_search query=${args}" en el chat` };
+    case 'graph-overview':
+      return { response: `Resumen del grafo: usa "graph_overview" en el chat` };
+    case 'skills':
+      return { response: `Skills disponibles: usa "skills" en el chat para listarlos` };
+    case 'config': {
+      if (!args) return { response: `Configuracion: ultron.json en la raiz del proyecto.\nUsa /config <key> <value> para modificar.` };
+      const [key, ...vals] = args.split(' ');
+      return { response: `Config: ${key} = ${vals.join(' ')} (usar chat para cambios complejos)` };
+    }
+    case 'sessions': case 'session-list':
+      return { response: `Lista de sesiones: usa "session_list" en el chat.` };
+    case 'session-new':
+      return { response: `Nueva sesion: usa "session_new name=${args || 'nueva'}" en el chat.` };
+    case 'session-switch': {
+      if (!args) return { response: 'Uso: /session-switch <session_id>' };
+      return { response: `Cambiar a sesion: usa "session_switch id=${args}" en el chat.` };
     }
     case 'stats': case 'tokens': {
       return { response: `Tokens: ${config.stats.tokens.toLocaleString()} | Requests: ${config.stats.requests} | Turnos: ${config.stats.turns} | Historial: ${config.stats.history} msgs` };
@@ -283,6 +304,14 @@ function helpText(): string {
   /resume          - Restaurar sesion
   /logs            - Ver logs recientes
   /status          - Estado del sistema
+  /config          - Ver/configurar ultron.json
+  /skills          - Ver skills disponibles
+  /graph-build     - Construir grafo de conocimiento avanzado
+  /graph-search    - Buscar en grafo de conocimiento
+  /graph-overview  - Vista general del grafo
+  /sessions        - Listar todas las sesiones
+  /session-new     - Crear nueva sesion
+  /session-switch  - Cambiar de sesion
   /exit            - Salir
 
 Atajos:

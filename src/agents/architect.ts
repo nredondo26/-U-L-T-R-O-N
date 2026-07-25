@@ -53,8 +53,10 @@ REGLAS:
 3. Cada paso debe ser CONCRETO y ACCIONABLE.
 4. Asigna agente: Editor (codigo), Basher (comandos), Librarian (analisis).
 5. Identifica dependencias: que paso debe completarse antes que otro.
-6. NO asumas nada - si falta informacion, preguntala.
-7. Usa el formato JSON estructurado.`,
+6. NO copies archivos del proyecto a otro directorio. El Editor trabaja directamente en el proyecto original.
+7. NO incluyas pasos de test/lint/build a menos que el usuario los haya solicitado.
+8. NO asumas nada - si falta informacion, preguntala.
+9. Usa el formato JSON estructurado.`,
       tools: [],
       temperature: 0.4,
       maxTokens: 4096,

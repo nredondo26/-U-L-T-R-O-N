@@ -6,8 +6,10 @@ import { chatCompletion } from '../llm/chat';
 import { getProviders, getAllModels, getHealthyModelList } from '../llm/providers';
 import { isModelHealthy, setHealthFile } from '../llm/health';
 import { ConfigStore } from '../shared/config';
+import { UltronConfigStore } from '../shared/ultron-config';
 import { ObsidianVault } from '../memory/vault';
 import { SessionMemory } from '../memory/session';
+import { SessionManager } from '../memory/session-manager';
 import { EditorAgent } from './editor';
 import { LibrarianAgent } from './librarian';
 import { BasherAgent } from './basher';
@@ -16,11 +18,16 @@ import { ThinkerAgent } from './thinker';
 import { ReviewerAgent } from './reviewer';
 import { ArchitectAgent } from './architect';
 import { GraphLearner } from './graph-learner';
+import { GraphMemoryBridge } from '../graph-memory/bridge';
+import { MCPServer } from '../mcp/server';
+import { StdioTransport } from '../mcp/stdio';
+import { SkillsLoader } from '../skills/loader';
+import { FileWatcher } from '../watcher/index';
 import { buildSystemPrompt, buildSummarizePrompt } from './prompts';
 import { executeTool, executeToolsParallel } from './tools-executor';
 import { handleCommand, isSlashCommand } from './commands';
 import * as fileTools from '../tools/file';
-    import { executeCommand } from '../tools/execute';
+import { executeCommand } from '../tools/execute';
 import { sandboxedExec, getSandboxConfig, setSandboxMode, allowAll, addAllow } from '../tools/sandbox';
 import { filterPrivateInfo } from '../memory/privacy';
 import { log } from '../shared/logger';
@@ -71,7 +78,9 @@ export class Orchestrator {
   private config: OrchestratorConfig;
   private vault: ObsidianVault;
   private session: SessionMemory;
+  private sessionManager: SessionManager;
   private configStore: ConfigStore;
+  private ultronConfig: UltronConfigStore;
   private conversation: Array<{ role: 'user' | 'assistant'; content: string }> = [];
   private editor: EditorAgent;
   private librarian: LibrarianAgent;
@@ -81,12 +90,18 @@ export class Orchestrator {
   private reviewer: ReviewerAgent;
   private architect: ArchitectAgent;
   private graphLearner: GraphLearner;
+  private graphMemory: GraphMemoryBridge;
+  private mcpServer: MCPServer;
+  private mcpTransport: StdioTransport | null = null;
+  private skillsLoader: SkillsLoader;
+  private fileWatcher: FileWatcher | null = null;
   private onEvent?: (event: AgentEvent) => void;
   private onStream?: (text: string) => void;
   private currentModel: string;
   private agentModels: Map<string, string> = new Map();
   private agentStates: Map<string, { status: string; message: string; history: Array<{ time: string; text: string }>; lastActive: number }> = new Map();
   private activeController: AbortController | null = null;
+  private sharedContext: Map<string, unknown> = new Map();
 
   setAgentModel(agentName: string, modelId: string): void {
     this.agentModels.set(agentName.toLowerCase(), modelId);
@@ -133,12 +148,25 @@ export class Orchestrator {
     return states;
   }
 
+  async executeToolDirectly(name: string, args: Record<string, unknown>): Promise<{ result: string; retries: number }> {
+    return this.runTool(name, args);
+  }
+
+  getGraphMemory(): GraphMemoryBridge { return this.graphMemory; }
+  getMCPServer(): MCPServer { return this.mcpServer; }
+  getSkillsLoader(): SkillsLoader { return this.skillsLoader; }
+  getUltronConfig(): UltronConfigStore { return this.ultronConfig; }
+  getSessionManager(): SessionManager { return this.sessionManager; }
+
   constructor(config: OrchestratorConfig) {
     this.config = config;
     this.vault = new ObsidianVault(config.vaultDir);
     setHealthFile(path.join(config.vaultDir, 'model-health.json'));
     this.session = new SessionMemory({ maxEvents: 500 });
     this.configStore = new ConfigStore(config.vaultDir);
+    this.ultronConfig = new UltronConfigStore(config.projectDir, config.vaultDir);
+    this.sessionManager = new SessionManager(config.vaultDir);
+    this.session = this.sessionManager.getActive();
     this.editor = new EditorAgent(config.projectDir);
     this.librarian = new LibrarianAgent(config.projectDir);
     this.basher = new BasherAgent(config.projectDir);
@@ -147,6 +175,11 @@ export class Orchestrator {
     this.reviewer = new ReviewerAgent();
     this.architect = new ArchitectAgent();
     this.graphLearner = new GraphLearner(this.vault, config.projectDir);
+    this.graphMemory = new GraphMemoryBridge(config.projectDir);
+    this.mcpServer = new MCPServer(this);
+    this.skillsLoader = new SkillsLoader(this.ultronConfig.getSkills().dirs);
+
+    this.initSubsystems();
 
     // Per-agent model overrides from env: ULTRON_MODEL_EDITOR=qwen-coder-plus
     for (const [k, v] of Object.entries(process.env)) {
@@ -154,6 +187,12 @@ export class Orchestrator {
         const agent = k.replace('ULTRON_MODEL_', '').toLowerCase();
         this.agentModels.set(agent, v);
       }
+    }
+
+    // Apply ultron.json agent model overrides
+    const cfgAgentModels = this.ultronConfig.getModels().agentModels;
+    for (const [agent, model] of Object.entries(cfgAgentModels)) {
+      this.agentModels.set(agent.toLowerCase(), model);
     }
 
     const saved = this.configStore.currentModel;
@@ -169,8 +208,54 @@ export class Orchestrator {
     log.info('Orchestrator initialized', { model: this.currentModel, projectDir: config.projectDir, historyMsgs: this.conversation.length });
   }
 
+  private async initSubsystems(): Promise<void> {
+    this.startMemoryWatchdog();
+    const mcpCfg = this.ultronConfig.getMCP();
+    const skillsCfg = this.ultronConfig.getSkills();
+    const watcherCfg = this.ultronConfig.getWatcher();
+
+    if (this.ultronConfig.getMemory().graphMemory) {
+      const ok = await this.graphMemory.init();
+      if (ok) log.info('GraphMemoryBridge active');
+      else log.warn('GraphMemoryBridge not available (code-graph-memory not installed)');
+    }
+
+    if (mcpCfg.enabled) {
+      await this.mcpServer.init();
+      this.mcpServer.registerToolsFromDefinitions(this.getTools());
+      if (mcpCfg.serverMode === 'stdio' || mcpCfg.serverMode === 'both') {
+        this.mcpTransport = new StdioTransport(this.mcpServer);
+      }
+      log.info('MCP Server initialized', { mode: mcpCfg.serverMode });
+    }
+
+    if (skillsCfg.enabled) {
+      const count = await this.skillsLoader.loadAll();
+      if (count > 0) log.info('Skills loaded', { count });
+    }
+
+    if (watcherCfg.enabled) {
+      this.fileWatcher = new FileWatcher({
+        watchDirs: watcherCfg.watchDirs,
+        watchExtensions: watcherCfg.watchExtensions,
+        debounceMs: watcherCfg.debounceMs,
+        onFileChange: (event, filePath) => {
+          this.emit({
+            type: 'action',
+            agent: 'Orchestrator',
+            displayName: 'Cerebro',
+            message: `Archivo ${event === 'add' ? 'añadido' : event === 'change' ? 'modificado' : 'eliminado'}: ${filePath}`,
+            data: { event, file: filePath },
+          });
+        },
+      });
+      this.fileWatcher.start();
+    }
+  }
+
   private lastListenerId = 0;
   private listeners: Map<string, { onEvent: (event: AgentEvent) => void; onStream: (text: string) => void }> = new Map();
+  private memTimer: ReturnType<typeof setInterval> | null = null;
 
   setEventEmitter(cb: (event: AgentEvent) => void): void { this.onEvent = cb; }
   setStreamCallback(cb: (text: string) => void): void { this.onStream = cb; }
@@ -180,6 +265,22 @@ export class Orchestrator {
     return id;
   }
   removeListener(id: string): void { this.listeners.delete(id); }
+
+  private startMemoryWatchdog(): void {
+    if (this.memTimer) return;
+    this.memTimer = setInterval(() => {
+      const mem = process.memoryUsage();
+      if (mem.heapUsed > 500 * 1024 * 1024) {
+        log.warn('High memory detected', { heapMB: Math.round(mem.heapUsed / 1024 / 1024) });
+        // Trim conversation
+        if (this.conversation.length > 6) this.conversation = this.conversation.slice(-6);
+        // Clean stale listeners
+        if (this.listeners.size > 10) this.listeners.clear();
+        // Force GC hint
+        global.gc?.();
+      }
+    }, 60000);
+  }
   getCurrentModel(): string { return this.currentModel; }
   setCurrentModel(modelId: string): boolean {
     if (getAllModels().some(m => m.model === modelId)) {
@@ -247,8 +348,18 @@ export class Orchestrator {
 
     this.emit({ type: 'thought', agent: 'Orchestrator', displayName: 'Cerebro', message: '' });
 
-    const graphCtx = this.graphLearner.buildGraphContext(input);
-    const sp = buildSystemPrompt(this.vault, this.session, this.configStore, this.config.projectDir, graphCtx).slice(0, 5000);
+    let graphCtx = this.graphLearner.buildGraphContext(input);
+
+    // Try graph memory bridge if available
+    if (this.graphMemory.isAvailable()) {
+      const cgmCtx = await this.graphMemory.search(input, undefined, 5);
+      if (cgmCtx.length > 0) {
+        graphCtx = `Grafo de conocimiento (code-graph-memory):\n${cgmCtx.map((r: any) => r.text).join('\n')}`;
+      }
+    }
+
+    const skillsCtx = this.skillsLoader.getSystemPrompt();
+    const sp = buildSystemPrompt(this.vault, this.session, this.configStore, this.config.projectDir, graphCtx, skillsCtx).slice(0, 5000);
     this.stream('');
     const msgs: ChatMessage[] = [{ role: 'system', content: sp }, ...this.conversation.slice(-6), { role: 'user', content: input }];
     const tools = this.getTools();
@@ -264,6 +375,7 @@ export class Orchestrator {
           c => {
             if (!c.content) return;
             streamBuf += c.content;
+            if (streamBuf.length > 50000) streamBuf = streamBuf.slice(-50000);
             if (!looksLikeFunctionCallStart(streamBuf)) this.stream(c.content);
           },
           ev => { this.currentModel = ev.to; },
@@ -272,9 +384,19 @@ export class Orchestrator {
 
         const tcs = resp.tool_calls?.length ? resp.tool_calls : tryParseTextToolCalls(resp.content);
         if (tcs?.length) {
-          msgs.push({ role: 'assistant', content: resp.content, tool_calls: tcs });
+          msgs.push({ role: 'assistant', content: resp.content?.slice(0, 2000) || null, tool_calls: tcs });
           const results = await executeToolsParallel(tcs, (n, a) => this.runTool(n, a));
-          for (const r of results) msgs.push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+          for (const r of results) {
+            const truncated = r.content.length > 1500 ? r.content.slice(0, 1500) + '...[truncated]' : r.content;
+            msgs.push({ role: 'tool', tool_call_id: r.tool_call_id, content: truncated });
+          }
+          // Keep msgs from growing too large — remove older messages if > 20
+          if (msgs.length > 20) {
+            const keep = msgs.filter(m => m.role === 'system');
+            keep.push(...msgs.slice(-20));
+            msgs.length = 0;
+            msgs.push(...keep.slice(0, 30));
+          }
         } else { out = resp.content || 'OK'; break; }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -287,9 +409,14 @@ export class Orchestrator {
 
     if (!out) out = 'Max steps.';
 
-    this.conversation.push({ role: 'user', content: input }, { role: 'assistant', content: out });
-    if (this.conversation.length > 20) this.conversation = this.conversation.slice(-20);
+    const userMsg = input.length > 2000 ? input.slice(0, 2000) : input;
+    const asstMsg = out.length > 3000 ? out.slice(0, 3000) + '...[truncated]' : out;
+    this.conversation.push({ role: 'user', content: userMsg }, { role: 'assistant', content: asstMsg });
+    if (this.conversation.length > 10) this.conversation = this.conversation.slice(-10);
     this.configStore.setChatHistory(this.conversation);
+
+    this.sessionManager.recordMessage(this.sessionManager.getActiveId(), 'user', input);
+    this.sessionManager.recordMessage(this.sessionManager.getActiveId(), 'assistant', out);
 
     log.chat('message processed', { tokens: this.configStore.stats.tokens, model: this.currentModel, inputLen: input.length, outputLen: out.length });
 
@@ -368,6 +495,16 @@ export class Orchestrator {
       return { result: r === 'ok' ? 'Eliminado: ' + args.path : r, retries: 0 };
     }
 
+    // Session management tools
+    if (name.startsWith('session_')) {
+      return await this.runSessionTool(name, args);
+    }
+
+    // Graph Memory tools (code-graph-memory bridge)
+    if (name.startsWith('graph_')) {
+      return await this.runGraphTool(name, args);
+    }
+
     const toolAgent = agentForTool(name);
     this.emit({ type: 'action', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args), data: args });
     log.tool(name, args, 'executing');
@@ -376,6 +513,118 @@ export class Orchestrator {
     log.tool(name, args, result.slice(0, 200));
     this.emit({ type: 'done', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args) + ' → ✓' });
     return { result, retries };
+  }
+
+  private async runSessionTool(name: string, args: Record<string, unknown>): Promise<{ result: string; retries: number }> {
+    const sm = this.sessionManager;
+
+    switch (name) {
+      case 'session_list': {
+        const sessions = sm.listSessions();
+        if (sessions.length === 0) return { result: 'No hay sesiones.', retries: 0 };
+        const lines = sessions.map(s => {
+          const active = s.id === sm.getActiveId() ? ' *' : '  ';
+          return `${active} ${s.id.slice(0, 12)}...  ${s.name.padEnd(20)} ${s.messageCount} msgs  ${new Date(s.updatedAt).toLocaleString()}`;
+        });
+        return { result: 'Sesiones:\n' + lines.join('\n'), retries: 0 };
+      }
+      case 'session_switch': {
+        const id = args.id as string;
+        const found = sm.listSessions().find(s => s.id.startsWith(id) || s.id === id);
+        if (!found) return { result: `Sesion no encontrada: ${id}. Usa session_list para ver IDs.`, retries: 0 };
+        sm.switchSession(found.id);
+        this.conversation = [];
+        this.session = sm.getActive();
+        return { result: `Sesion cambiada a: ${found.name} (${found.id.slice(0, 12)}...)`, retries: 0 };
+      }
+      case 'session_rename': {
+        const ok = sm.renameSession(args.id as string, args.name as string);
+        return { result: ok ? `Sesion renombrada a: ${args.name}` : 'Sesion no encontrada.', retries: 0 };
+      }
+      case 'session_delete': {
+        const ok = sm.deleteSession(args.id as string);
+        if (ok && sm.getActiveId() !== this.sessionManager.getActiveId()) {
+          this.session = sm.getActive();
+          this.conversation = [];
+        }
+        return { result: ok ? 'Sesion eliminada.' : 'No se pudo eliminar (minimo 1 sesion).', retries: 0 };
+      }
+      case 'session_new': {
+        const newId = sm.createSession(args.name as string, args.model as string || this.currentModel);
+        sm.switchSession(newId);
+        this.session = sm.getActive();
+        this.conversation = [];
+        return { result: `Nueva sesion creada: ${sm.getMeta(newId).name} (${newId.slice(0, 12)}...)`, retries: 0 };
+      }
+      default:
+        return { result: `Herramienta de sesion desconocida: ${name}`, retries: 0 };
+    }
+  }
+
+  private async runGraphTool(name: string, args: Record<string, unknown>): Promise<{ result: string; retries: number }> {
+    if (!this.graphMemory.isAvailable()) {
+      return { result: 'Grafo de conocimiento no disponible. Instala code-graph-memory o usa /index para el grafo basico.', retries: 0 };
+    }
+
+    const toolAgent = 'GraphLearner';
+    this.emit({ type: 'action', agent: toolAgent, displayName: 'Graph', message: name.replace('graph_', ''), data: args });
+
+    try {
+      let result = '';
+      switch (name) {
+        case 'graph_build':
+          const dir = (args.directory as string) || this.config.projectDir;
+          const r = await this.graphMemory.build(dir);
+          result = `Grafo construido: ${r.nodes} nodos, ${r.edges} edges, ${r.files} archivos.`;
+          break;
+        case 'graph_search':
+          result = (await this.graphMemory.search(args.query as string, args.type as string, (args.limit as number) || 10))
+            .map((n: any) => n.text).join('\n') || 'Sin resultados.';
+          break;
+        case 'graph_related':
+          result = await this.graphMemory.related(args.node as string, (args.depth as number) || 1);
+          break;
+        case 'graph_compact':
+          const c = await this.graphMemory.compact(args.file as string);
+          result = c?.content || 'No disponible.';
+          break;
+        case 'graph_overview':
+          result = await this.graphMemory.overview();
+          break;
+        case 'graph_callers':
+          result = await this.graphMemory.callers(args.name as string, (args.depth as number) || 1);
+          break;
+        case 'graph_dependencies':
+          result = await this.graphMemory.dependencies(args.name as string);
+          break;
+        case 'graph_path':
+          result = await this.graphMemory.path(args.from as string, args.to as string);
+          break;
+        case 'graph_concepts':
+          const concepts = await this.graphMemory.concepts(args.query as string);
+          result = concepts.map((c: any) => c.text).join('\n') || 'Sin conceptos.';
+          break;
+        case 'graph_stats':
+          result = await this.graphMemory.stats();
+          break;
+        case 'graph_file_summary':
+          result = await this.graphMemory.fileSummary(args.file as string);
+          break;
+        case 'graph_read_range':
+          result = await this.graphMemory.readRange(args.file as string, args.start as number, args.end as number);
+          break;
+        default:
+          result = `Tool desconocida: ${name}`;
+      }
+
+      this.emit({ type: 'done', agent: toolAgent, displayName: 'Graph', message: name.replace('graph_', '') + ' → ✓' });
+      return { result, retries: 0 };
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e.message : String(e);
+      log.warn('Graph tool error', { tool: name, error: err });
+      this.emit({ type: 'done', agent: toolAgent, displayName: 'Graph', message: name.replace('graph_', '') + ' → ✗' });
+      return { result: `Error: ${err}`, retries: 0 };
+    }
   }
 
   private async autoSummary(): Promise<void> {
@@ -415,7 +664,7 @@ export class Orchestrator {
       d('memory_read', 'Lee un archivo de la memoria', { path: { type: 'string' } }, ['path']),
       d('memory_list', 'Lista todos los archivos de la memoria', {}, []),
       d('memory_delete', 'Elimina un archivo de la memoria (solo si el usuario lo pide)', { path: { type: 'string' } }, ['path']),
-      d('run_lint', 'Ejecuta typecheck/lint', {}, []),
+      d('run_lint', 'SOLO cuando el usuario lo pida explicitamente: ejecuta typecheck/lint', {}, []),
       d('speak', 'Habla texto en voz alta', { text: { type: 'string' }, voice: { type: 'string' } }, ['text']),
       d('mouse_click', 'Hace click del mouse (left/right)', { button: { type: 'string' } }, []),
       d('mouse_move', 'Mueve el mouse a coordenadas (x,y)', { x: { type: 'number' }, y: { type: 'number' } }, ['x', 'y']),
@@ -432,6 +681,25 @@ export class Orchestrator {
       d('save_file', 'Guarda un archivo en una ruta especifica y verifica', { path: { type: 'string' }, content: { type: 'string' } }, ['path', 'content']),
       d('check_file', 'Verifica si un archivo existe y muestra su contenido', { path: { type: 'string' } }, ['path']),
       d('desktop_path', 'Devuelve la ruta del Escritorio', {}, []),
+      // Graph Memory tools (code-graph-memory integration)
+      d('graph_search', 'Busca clases, funciones, interfaces por nombre en el grafo de conocimiento', { query: { type: 'string' }, type: { type: 'string' }, limit: { type: 'number' } }, ['query']),
+      d('graph_related', 'Muestra relaciones de un nodo en el grafo (dependencias, usos)', { node: { type: 'string' }, depth: { type: 'number' } }, ['node']),
+      d('graph_compact', 'Resumen compacto de un archivo (clases, funciones, firmas)', { file: { type: 'string' } }, ['file']),
+      d('graph_overview', 'Vista general del proyecto: modulos, patrones, estadisticas', {}, []),
+      d('graph_callers', 'Encuentra quien llama/usar una funcion o clase', { name: { type: 'string' }, depth: { type: 'number' } }, ['name']),
+      d('graph_dependencies', 'Muestra todas las dependencias de un nodo (que importa/usa)', { name: { type: 'string' } }, ['name']),
+      d('graph_path', 'Encuentra el camino de dependencia entre dos nodos', { from: { type: 'string' }, to: { type: 'string' } }, ['from', 'to']),
+      d('graph_concepts', 'Muestra conceptos arquitectonicos y patrones detectados', { query: { type: 'string' } }, []),
+      d('graph_stats', 'Estadisticas del grafo de conocimiento', {}, []),
+      d('graph_build', 'Indexa el proyecto en el grafo de conocimiento (AST parsing)', { directory: { type: 'string' } }, []),
+      d('graph_file_summary', 'Resumen detallado de un archivo (estructura, imports, exports)', { file: { type: 'string' } }, ['file']),
+      d('graph_read_range', 'Lee lineas especificas de un archivo usando el grafo', { file: { type: 'string' }, start: { type: 'number' }, end: { type: 'number' } }, ['file', 'start', 'end']),
+      // Session management tools
+      d('session_list', 'Lista todas las sesiones disponibles con su estado', {}, []),
+      d('session_switch', 'Cambia a otra sesion por ID', { id: { type: 'string' } }, ['id']),
+      d('session_rename', 'Renombra una sesion', { id: { type: 'string' }, name: { type: 'string' } }, ['id', 'name']),
+      d('session_delete', 'Elimina una sesion', { id: { type: 'string' } }, ['id']),
+      d('session_new', 'Crea una nueva sesion', { name: { type: 'string' }, model: { type: 'string' } }, []),
     ];
   }
 }

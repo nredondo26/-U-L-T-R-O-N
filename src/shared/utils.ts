@@ -37,27 +37,33 @@ export function sanitizeFilename(name: string): string {
 }
 
 export function loadEnv(envPath?: string): void {
+  const cwd = process.cwd();
   const tryPaths = envPath
     ? [envPath]
     : [
-        path.join(process.cwd(), '.env'),
-        path.join(process.cwd(), '..', '.env'),
-        path.join(path.dirname(process.execPath), '.env'),
+        path.join(cwd, '.env'),
+        path.join(cwd, '..', '.env'),
+        path.join(cwd, '..', '..', '.env'),
       ];
+  let loaded = false;
   for (const p of tryPaths) {
     try {
       if (fs.existsSync(p)) {
-        fs.readFileSync(p, 'utf8').split('\n').forEach(line => {
+        const content = fs.readFileSync(p, 'utf8');
+        content.split('\n').forEach(line => {
           const eq = line.indexOf('=');
           if (eq > 0) {
             const k = line.slice(0, eq).trim();
             const v = line.slice(eq + 1).trim();
-            if (k && v && !process.env[k]) process.env[k] = v;
+            if (k && v && !process.env[k]) {
+              process.env[k] = v;
+              if (k.endsWith('_API_KEY')) loaded = true;
+            }
           }
         });
       }
-    } catch (e) {
-      console.warn(`[utils] loadEnv failed for ${p}:`, e instanceof Error ? e.message : e);
+    } catch {
+      // silently continue
     }
   }
 }

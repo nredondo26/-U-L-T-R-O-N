@@ -7,9 +7,15 @@ export interface ThemeColors {
   bright: string; bg: string; matrix: string;
 }
 
-export type ThemeName = 'ultron' | 'sky' | 'cyber' | 'midnight' | 'matrix';
+export type ThemeName = 'claude' | 'ultron' | 'sky' | 'cyber' | 'midnight' | 'matrix';
 
 export const themes: Record<string, ThemeColors> = {
+  claude: {
+    primary: '#d97706', accent: '#f59e0b', success: '#10b981',
+    warn: '#f59e0b', error: '#ef4444', dim: '#78716c',
+    surface: '#292524', text: '#e7e5e4', bright: '#fafaf9',
+    bg: '#1c1917', matrix: '#92400e',
+  },
   ultron: {
     primary: '#22d3ee', accent: '#67e8f9', success: '#4ade80',
     warn: '#fbbf24', error: '#f87171', dim: '#64748b',
@@ -42,7 +48,7 @@ export const themes: Record<string, ThemeColors> = {
   },
 };
 
-let currentTheme: ThemeName = 'ultron';
+let currentTheme: ThemeName = 'claude';
 
 export function getTheme(): ThemeColors { return themes[currentTheme]; }
 export function setTheme(name: ThemeName): void { if (themes[name]) currentTheme = name; }

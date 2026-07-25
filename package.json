@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "chalk": "^5.4.1",
+    "code-graph-memory": "file:../code-graph-memory",
     "mammoth": "^1.12.0",
     "openai": "^5.6.0",
     "pdf-parse": "^2.4.5",
@@ -51,6 +52,7 @@
     "rcedit": "^5.0.2",
     "typescript": "^5.8.0"
   },
+  "workspaces": ["../code-graph-memory"],
   "engines": {
     "bun": ">=1.3.0"
   },

@@ -1,12 +1,10 @@
-// src/cli/display.ts
-// Professional CLI visual — clean, minimal, like OpenCode
-
 import chalk from 'chalk';
 import { getTheme, type ThemeName, setTheme as setThemeFn, getThemeName, listThemes } from './theme';
 
 const C = (key: keyof ReturnType<typeof getTheme>) => chalk.hex(getTheme()[key]);
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+const DOT_FRAMES = ['  ', '. ', '..', '...'];
 
 export class Spinner {
   private frame = 0;
@@ -15,6 +13,7 @@ export class Spinner {
   private agent = '';
   private active = false;
   private startTime = 0;
+  private dotPhase = 0;
 
   constructor(agent: string, message = '') {
     this.agent = agent;
@@ -25,17 +24,20 @@ export class Spinner {
     if (this.active) return;
     this.active = true; this.frame = 0; this.startTime = Date.now();
     this.render();
-    this.interval = setInterval(() => this.render(), 80);
+    this.interval = setInterval(() => this.render(), 100);
   }
 
   private render(): void {
     if (!this.active) return;
-    const frame = C('accent')(SPINNER_FRAMES[this.frame % SPINNER_FRAMES.length]);
     const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
-    const agent = C('dim')(this.agent);
-    const msg = this.message ? ` ${C('dim')(this.message.slice(0, 60))}` : '';
-    process.stdout.write(`\r\x1b[K  ${frame} ${agent} ${C('dim')(elapsed + 's')}${msg}`);
+    const frame = C('accent')(SPINNER_FRAMES[this.frame % SPINNER_FRAMES.length]);
+    const dots = DOT_FRAMES[this.dotPhase % DOT_FRAMES.length];
+    const agent = C('accent')(this.agent);
+    const msg = this.message ? ` ${C('dim')(this.message.slice(0, 50))}` : '';
+    const time = C('dim')(elapsed + 's');
+    process.stdout.write(`\r\x1b[K  ${frame}  ${agent}${msg}  ${time}`);
     this.frame++;
+    this.dotPhase = Math.floor(this.frame / 3) % DOT_FRAMES.length;
   }
 
   stop(): void {
@@ -45,6 +47,12 @@ export class Spinner {
   }
 
   updateMessage(msg: string): void { this.message = msg; }
+}
+
+let spinnerActive = false;
+
+export function setSpinnerState(active: boolean): void {
+  spinnerActive = active;
 }
 
 export function resetStreamState(): void {}
@@ -57,45 +65,31 @@ const DISPLAY_NAMES: Record<string, string> = {
 
 export function agentChip(agent: string): string {
   const colors: Record<string, (t: string) => string> = {
-    Orchestrator: C('primary'), Editor: C('success'), Librarian: C('warn'),
-    Basher: C('accent'), Researcher: C('primary'), Thinker: C('bright'), Reviewer: C('warn'),
+    Orchestrator: C('accent'), Editor: C('success'), Librarian: C('warn'),
+    Basher: C('primary'), Researcher: C('accent'), Thinker: C('warn'), Reviewer: C('error'),
   };
   return (colors[agent] || C('dim'))(DISPLAY_NAMES[agent] || agent);
 }
 
-export function logo(): string {
-  const d = C('dim');
-  return [
-    `  ${d('┌─────────────────────────────────────────────┐')}`,
-    `  ${d('│')}             ${C('bright')('U L T R O N')}               ${d('│')}`,
-    `  ${d('│')}        ${d('Neural Intelligence Platform')}          ${d('│')}`,
-    `  ${d('└─────────────────────────────────────────────┘')}`,
-  ].join('\n');
-}
-
 export function welcome(providers: string[], model: string, tokens: number, reqs: number, history: number, theme: string): string {
-  const s = C('success');
+  const a = C('accent');
   const d = C('dim');
   const p = C('primary');
   const dots = providers.length > 0
-    ? providers.map(n => s(n)).join(` ${d('.')} `)
-    : C('error')('no providers');
+    ? providers.map(n => d(n)).join(` ${d('·')} `)
+    : d('none');
 
   return [
-    logo(),
+    `  ${a('◆')} ${p('ULTRON')} ${d('v5')}`,
+    `  ${d('model')} ${a(model)}  ${d('tokens')} ${a(tokens.toLocaleString())}`,
     '',
-    `  ${d('providers')}  ${dots}`,
-    `  ${d('model')}     ${p(model)}`,
-    `  ${d('theme')}     ${d(theme)}`,
-    ...(history > 0 ? [`  ${d('history')}  ${d(history + ' messages')}`] : []),
-    '',
-    `  ${d('type')} a message  ${d('/help')} for commands  ${d('!cmd')} to run  ${d('@file')} to read`,
+    `  ${d('type a message · /help · !cmd · @file')}`,
     '',
   ].join('\n');
 }
 
 export function hr(): string {
-  return C('dim')('  ─────────────────────────────────────────────');
+  return C('dim')('  ─────────────────────────────────────────────────');
 }
 
 export function formatResponse(text: string): string {
@@ -110,7 +104,7 @@ export function formatResponse(text: string): string {
       const footer = `\n  ${d(`└${'─'.repeat(50)}`)}`;
       return `${header}\n${body}${footer}`;
     })
-    .replace(/`([^`]+)`/g, (_, c) => C('primary')(c))
+    .replace(/`([^`]+)`/g, (_, c) => C('accent')(c))
     .replace(/\*\*(.+?)\*\*/g, (_, t) => C('bright')(t));
 }
 
@@ -119,11 +113,11 @@ export function formatSlashResponse(text: string): string {
 }
 
 export function promptText(): string {
-  return `${C('accent')('>')} `;
+  return `${C('accent')('◆')} `;
 }
 
 export function promptModel(): string {
-  return `${C('warn')('> model')} `;
+  return `${C('warn')('◆ model')} `;
 }
 
 export interface SelectOption { label: string; value: string; group?: string; }
@@ -135,7 +129,7 @@ export function printSelectMenu(title: string, options: SelectOption[], currentV
     if (opt.group && opt.group !== currentGroup) { currentGroup = opt.group; out += `\n  ${C('dim')(currentGroup)}\n`; }
     num++;
     const active = opt.value === currentValue;
-    out += `  ${active ? C('success')('●') : C('dim')('○')} ${String(num).padStart(2, ' ')} ${active ? C('success')(opt.label) : opt.label}\n`;
+    out += `  ${active ? C('accent')('◆') : C('dim')('◇')} ${C('dim')(String(num).padStart(2, ' '))} ${active ? C('accent')(opt.label) : opt.label}\n`;
   }
   out += `\n  ${C('dim')(`enter 1-${num} to select`)}`;
   process.stdout.write(out + '\n');
@@ -147,7 +141,7 @@ export function showTokens(tokens: number, requests: number): string {
 }
 
 export function footer(tokens: number, requests: number, model: string): string {
-  return `  ${C('dim')('─'.repeat(50))}\n  ${C('dim')(`${model}  ·  ${tokens.toLocaleString()} tokens  ·  ${requests} reqs`)}\n`;
+  return `  ${C('dim')('─'.repeat(50))}\n  ${C('dim')(`${model}`)} ${C('dim')('·')} ${C('dim')(`${tokens.toLocaleString()} tokens`)} ${C('dim')('·')} ${C('dim')(`${requests} reqs`)}\n`;
 }
 
 export { setThemeFn as setTheme, getThemeName, listThemes };

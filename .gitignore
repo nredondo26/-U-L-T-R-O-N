@@ -34,3 +34,11 @@ api_key*
 tmp/
 temp/
 *.tsbuildinfo
+
+# Electron desktop
+electron/node_modules/
+electron/dist/
+electron/*.log
+
+# No ignorar config importante
+!ultron.json

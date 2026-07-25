@@ -1,0 +1,88 @@
+{
+  "version": "5.1.0",
+  "project": {
+    "name": "ULTRON",
+    "description": "Neural Intelligence Platform — Multi-Agent Autonomous AI",
+    "rootDir": ".",
+    "vaultDir": "./vault",
+    "ignoreDirs": ["node_modules", ".git", "dist", "build", ".gradle", "__pycache__"],
+    "ignorePatterns": ["*.min.js", "*.min.css", "*.map"]
+  },
+  "agents": {
+    "enabled": ["orchestrator", "editor", "librarian", "basher", "researcher", "thinker", "reviewer", "architect"],
+    "maxSteps": 25,
+    "defaultAgent": "orchestrator",
+    "verbose": true,
+    "autoDelegate": true,
+    "delegationStrategy": "structured",
+    "sharedContext": true
+  },
+  "models": {
+    "provider": "dashscope",
+    "defaultModel": "deepseek-chat",
+    "agentModels": {
+      "editor": "qwen-coder-plus",
+      "basher": "deepseek-chat",
+      "researcher": "meta/llama-3.1-8b-instruct"
+    },
+    "fallbackChain": [],
+    "freeFirst": true,
+    "circuitBreaker": {
+      "enabled": true,
+      "maxRetries": 3,
+      "cooldownMs": 60000,
+      "failureThreshold": 5,
+      "recoveryThreshold": 2
+    },
+    "costTracking": {
+      "enabled": true,
+      "monthlyBudget": 0,
+      "sessionBudget": 0,
+      "warnAt": 0.8
+    }
+  },
+  "memory": {
+    "vaultType": "obsidian",
+    "graphMemory": true,
+    "autoSummarize": true,
+    "summarizeEvery": 12,
+    "maxHistoryMessages": 20,
+    "sessionRetention": 86400000
+  },
+  "mcp": {
+    "enabled": true,
+    "serverMode": "stdio",
+    "port": 3457,
+    "tools": ["*"],
+    "allowCustomTools": true
+  },
+  "skills": {
+    "enabled": true,
+    "dirs": [".opencode/skills"],
+    "autoLoad": true,
+    "defaultSkill": ""
+  },
+  "watcher": {
+    "enabled": false,
+    "debounceMs": 500,
+    "watchDirs": ["src"],
+    "watchExtensions": [".ts", ".tsx", ".js", ".jsx", ".py", ".kt", ".java", ".go", ".rs"],
+    "autoIndex": true,
+    "onFileChange": ["graph_index"]
+  },
+  "security": {
+    "sandboxMode": "ask",
+    "allowedCommands": [],
+    "apiKeyAuth": false,
+    "corsOrigins": ["*"],
+    "rateLimiting": true,
+    "maxBodySize": 1048576
+  },
+  "ui": {
+    "theme": "ultron",
+    "showAgentPanel": true,
+    "showTokenCounter": true,
+    "compactMode": false,
+    "language": "es"
+  }
+}

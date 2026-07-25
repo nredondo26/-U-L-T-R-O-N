@@ -60,26 +60,36 @@ export async function runCLI(options: {
   let wasStreamed = false;
   let verboseMode = true; // Show agent activity by default
 
+  function startSpinner(agent: string, msg: string): void {
+    if (spinner) spinner.stop();
+    spinner = new Spinner(agent, msg);
+    spinner.start();
+  }
+
+  function stopSpinner(): void {
+    if (spinner) { spinner.stop(); spinner = null; }
+  }
+
   orch.setEventEmitter((event: AgentEvent) => {
     if (event.type === 'thought') {
-      if (spinner) spinner.updateMessage(event.message);
-      else { spinner = new Spinner(event.agent, event.message); spinner.start(); }
+      if (!spinner) startSpinner(event.agent, 'thinking');
+      else spinner.updateMessage(event.message || 'thinking');
     } else if (event.type === 'action') {
-      if (spinner) { spinner.stop(); spinner = null; }
+      stopSpinner();
       if (verboseMode) {
         const label = event.data
           ? String((event.data as Record<string,unknown>).command || (event.data as Record<string,unknown>).task || (event.data as Record<string,unknown>).filePath || event.message).slice(0, 50)
           : event.message;
-        process.stdout.write(`  ${TC('dim')('[')}${TC('accent')(event.agent.slice(0,8))}${TC('dim')(']')} ${TC('dim')(label)}\n`);
+        process.stdout.write(`  ${TC('dim')('┃')} ${TC('accent')(event.agent.slice(0,8))} ${TC('dim')(label)}\n`);
       }
-      spinner = new Spinner(event.agent, event.message); spinner.start();
+      startSpinner(event.agent, event.message);
     } else if (event.type === 'done') {
-      if (spinner) { spinner.stop(); spinner = null; }
+      stopSpinner();
     }
   });
 
   orch.setStreamCallback((text: string) => {
-    if (spinner) { spinner.stop(); spinner = null; }
+    stopSpinner();
     if (!wasStreamed) { process.stdout.write('\n'); resetStreamState(); }
     wasStreamed = true;
     process.stdout.write(text);
@@ -107,14 +117,16 @@ export async function runCLI(options: {
 
     // !bash
     if (input.startsWith('!')) {
-      busy = true; wasStreamed = false; spinner = null;
-      console.log('\n' + hr());
+      busy = true; wasStreamed = false; stopSpinner();
+      process.stdout.write('\n' + hr() + '\n');
+      startSpinner('Cerebro', 'running');
       try {
         const r = await orch.handleMessage(input);
-        if (!wasStreamed) console.log(r);
+        stopSpinner();
+        if (!wasStreamed) process.stdout.write(r + '\n');
         await repair(rl, orch, r, input.slice(1).trim(), input, wasStreamed);
-      } catch (e: unknown) { console.log('  error: ' + (e instanceof Error ? e.message : String(e))); }
-      console.log(footer(orch.getStats().tokens, orch.getStats().requests, orch.getCurrentModel()));
+      } catch (e: unknown) { stopSpinner(); process.stdout.write('  error: ' + (e instanceof Error ? e.message : String(e)) + '\n'); }
+      process.stdout.write(footer(orch.getStats().tokens, orch.getStats().requests, orch.getCurrentModel()));
       busy = false; rl.prompt();
       return;
     }
@@ -174,7 +186,10 @@ export async function runCLI(options: {
         case 'install': case 'build': case 'test': case 'index': case 'cd': case 'say':
         case 'click': case 'type': case 'press': case 'screenshot': case 'mouse':
         case 'model': case 'health': case 'graph': case 'stats': case 'allow': case 'clear': case 'verbose': case 'quiet':
-        case 'commit': case 'push': case 'diff': case 'log': case 'resume': {
+        case 'commit': case 'push': case 'diff': case 'log': case 'resume':
+        case 'skills': case 'config':
+        case 'graph-build': case 'graph-search': case 'graph-overview':
+        case 'sessions': case 'session-new': case 'session-switch': {
           const r = await orch.handleMessage(input);
           console.log(formatSlashResponse(r));
           break;
@@ -211,18 +226,20 @@ export async function runCLI(options: {
     }
 
     // Normal message
-    busy = true; wasStreamed = false; spinner = null;
-    console.log('\n' + hr());
+    busy = true; wasStreamed = false; stopSpinner();
+    process.stdout.write('\n' + hr() + '\n');
+    startSpinner('Cerebro', 'thinking');
 
     try {
       const r = await orch.handleMessage(input);
-      if (!wasStreamed) console.log(formatResponse(r));
+      stopSpinner();
+      if (!wasStreamed) process.stdout.write(formatResponse(r) + '\n');
     } catch (e: unknown) {
-      const s = spinner as Spinner | null; s?.stop(); spinner = null;
-      console.log('    ' + TC('error')((e instanceof Error ? e.message : String(e)).split('\n')[0]));
+      stopSpinner();
+      process.stdout.write('  ' + TC('error')((e instanceof Error ? e.message : String(e)).split('\n')[0]) + '\n');
     }
 
-    console.log(footer(orch.getStats().tokens, orch.getStats().requests, orch.getCurrentModel()));
+    process.stdout.write(footer(orch.getStats().tokens, orch.getStats().requests, orch.getCurrentModel()));
     busy = false; rl.prompt();
   });
 

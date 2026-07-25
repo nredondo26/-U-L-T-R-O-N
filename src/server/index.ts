@@ -200,6 +200,26 @@ export function startWebServer(
       handleLogs(req, res);
       return;
     }
+    if (req.url === '/api/sessions' && req.method === 'GET') {
+      handleSessionsList(res);
+      return;
+    }
+    if (req.url === '/api/sessions/switch' && req.method === 'POST') {
+      handleSessionSwitch(req, res);
+      return;
+    }
+    if (req.url === '/api/sessions/new' && req.method === 'POST') {
+      handleSessionNew(req, res);
+      return;
+    }
+    if (req.url === '/api/sessions/rename' && req.method === 'POST') {
+      handleSessionRename(req, res);
+      return;
+    }
+    if (req.url === '/api/sessions/delete' && req.method === 'POST') {
+      handleSessionDelete(req, res);
+      return;
+    }
     if (req.url === '/ws') {
       handleSSE(req, res);
       return;
@@ -467,6 +487,68 @@ export function startWebServer(
       memory: process.memoryUsage().rss,
       health: getHealthSummary(),
     }));
+  }
+
+  function handleSessionsList(res: ServerResponse): void {
+    try {
+      const sessions = orchestrator.getSessionManager().listSessions();
+      const activeId = orchestrator.getSessionManager().getActiveId();
+      safeJson(res, 200, { sessions: sessions.map(s => ({ ...s, active: s.id === activeId })) });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
+  }
+
+  async function handleSessionSwitch(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(req);
+      const { id } = JSON.parse(body);
+      if (!id) { safeJson(res, 400, { error: 'missing id' }); return; }
+      const sm = orchestrator.getSessionManager();
+      const found = sm.listSessions().find(s => s.id.startsWith(id) || s.id === id);
+      if (!found) { safeJson(res, 404, { error: 'session not found' }); return; }
+      sm.switchSession(found.id);
+      safeJson(res, 200, { ok: true, session: found });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
+  }
+
+  async function handleSessionNew(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(req);
+      const { name, model } = JSON.parse(body);
+      const sm = orchestrator.getSessionManager();
+      const newId = sm.createSession(name || 'Nueva sesion', model || orchestrator.getCurrentModel());
+      sm.switchSession(newId);
+      safeJson(res, 200, { ok: true, session: sm.getMeta(newId) });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
+  }
+
+  async function handleSessionRename(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(req);
+      const { id, name } = JSON.parse(body);
+      if (!id || !name) { safeJson(res, 400, { error: 'missing id or name' }); return; }
+      const ok = orchestrator.getSessionManager().renameSession(id, name);
+      safeJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'session not found' });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
+  }
+
+  async function handleSessionDelete(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(req);
+      const { id } = JSON.parse(body);
+      if (!id) { safeJson(res, 400, { error: 'missing id' }); return; }
+      const ok = orchestrator.getSessionManager().deleteSession(id);
+      safeJson(res, ok ? 200 : 400, ok ? { ok: true } : { error: 'cannot delete (minimum 1 session)' });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
   }
 
   function handleSSE(_req: IncomingMessage, res: ServerResponse) {

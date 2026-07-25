@@ -34,7 +34,8 @@ rotateLogs();
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 const LOG_LEVELS: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
-const currentLevel: LogLevel = (process.env.JARVIS_LOG_LEVEL as LogLevel) || 'info';
+const isCompiled = process.argv[1] === undefined || !process.argv[1]?.includes('src/index.ts');
+const currentLevel: LogLevel = (process.env.JARVIS_LOG_LEVEL as LogLevel) || (isCompiled ? 'error' : 'info');
 
 function writeLog(level: LogLevel, msg: string, data?: Record<string, unknown>): void {
   if (LOG_LEVELS[level] < LOG_LEVELS[currentLevel]) return;
@@ -48,15 +49,16 @@ function writeLog(level: LogLevel, msg: string, data?: Record<string, unknown>):
 
   const line = JSON.stringify(entry);
 
-  // Console output (colored in dev)
-  const colors: Record<LogLevel, string> = { debug: '\x1b[36m', info: '\x1b[32m', warn: '\x1b[33m', error: '\x1b[31m' };
-  const reset = '\x1b[0m';
-  const ts = new Date().toISOString().slice(11, 19);
-
-  if (process.env.NODE_ENV === 'production') {
-    console.log(line);
-  } else {
-    console.log(`${colors[level]}[${ts}] ${level.toUpperCase()}${reset} ${msg}${data ? ' ' + JSON.stringify(data).slice(0, 100) : ''}`);
+  // Console output (only errors in compiled mode)
+  if (!isCompiled || level === 'error') {
+    const colors: Record<LogLevel, string> = { debug: '\x1b[36m', info: '\x1b[32m', warn: '\x1b[33m', error: '\x1b[31m' };
+    const reset = '\x1b[0m';
+    const ts = new Date().toISOString().slice(11, 19);
+    if (isCompiled && level === 'error') {
+      console.error(`${colors[level]}[${ts}] ERROR${reset} ${msg}`);
+    } else if (!isCompiled) {
+      console.log(`${colors[level]}[${ts}] ${level.toUpperCase()}${reset} ${msg}${data ? ' ' + JSON.stringify(data).slice(0, 100) : ''}`);
+    }
   }
 
   // File output

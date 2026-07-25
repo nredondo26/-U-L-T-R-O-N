@@ -80,19 +80,31 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .stop-btn{background:transparent;color:var(--error);border:1px solid var(--error);border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:11px;font-family:var(--mono);white-space:nowrap;display:none;height:30px}
 .stop-btn:hover{background:rgba(249,112,131,.1)}
 
-.agent-panel{width:220px;background:var(--sidebar-bg);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
-.agent-panel-title{padding:8px 12px;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)}
+.agent-panel{width:240px;background:var(--sidebar-bg);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.agent-panel-title{padding:8px 12px;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.agent-panel-title .dot-count{font-size:9px;color:var(--dim);font-family:var(--mono)}
 .agent-list{flex:1;overflow-y:auto;padding:4px}
-.agent-item{padding:6px 10px;border-radius:var(--radius);margin:1px 0;transition:all .15s;cursor:default;display:flex;align-items:center;gap:8px;font-size:11px}
-.agent-item:hover{background:var(--hover)}
-.agent-item.active{background:var(--accent-dim)}
-.agent-item .agent-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--dim)}
-.agent-item.active .agent-dot{background:var(--accent);animation:pulse 1s ease-in-out infinite}
-.agent-item.done .agent-dot{background:var(--success)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.agent-item{padding:4px 8px;border-radius:var(--radius);margin:1px 0;transition:all .15s;cursor:pointer;display:flex;flex-direction:column;gap:2px;font-size:11px;border:1px solid transparent}
+.agent-item:hover{background:var(--hover);border-color:var(--border)}
+.agent-item.active{background:var(--accent-dim);border-color:var(--accent)}
+.agent-item.done{opacity:.7}
+.agent-item-header{display:flex;align-items:center;gap:6px;width:100%}
+.agent-item .agent-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--dim);transition:all .3s}
+.agent-item.active .agent-dot{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.agent-item .agent-bar{height:2px;flex:1;background:var(--border);border-radius:2px;overflow:hidden;opacity:0;transition:opacity .3s}
+.agent-item.active .agent-bar{opacity:1}
+.agent-item .agent-bar-fill{height:100%;background:var(--accent);border-radius:2px;animation:barScan 1.5s ease-in-out infinite;width:30%}
+@keyframes barScan{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
 .agent-item .agent-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:10px;color:var(--dim)}
-.agent-item.active .agent-label{color:var(--text)}
+.agent-item.active .agent-label{color:var(--bright)}
 .agent-item.done .agent-label{color:var(--success)}
+.agent-item .agent-msg{font-size:9px;color:var(--dim);font-family:var(--mono);padding-left:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-height:0;transition:all .3s}
+.agent-item.active .agent-msg{max-height:20px;color:var(--accent)}
+.agent-item.done .agent-msg{max-height:0}
+.agent-item .agent-log{font-size:8px;color:var(--dim);font-family:var(--mono);padding-left:14px;max-height:0;overflow:hidden;transition:max-height .3s;border-left:1px solid var(--border);margin-top:2px}
+.agent-item.expanded .agent-log{max-height:100px;overflow-y:auto}
+.agent-log-entry{padding:1px 4px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-log-entry:last-child{opacity:1;color:var(--text)}
 
 .status-bar{display:flex;align-items:center;padding:0 12px;height:22px;background:var(--sidebar-bg);border-top:1px solid var(--border);gap:16px;flex-shrink:0;font-size:10px;font-family:var(--mono);color:var(--dim)}
 .status-bar .bar-item{display:flex;align-items:center;gap:4px}
@@ -166,7 +178,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 </div>
 <div class="main">
   <div class="sidebar" id="fileTree">
-    <div class="sidebar-title">Project</div>
+    <div class="sidebar-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Sessions</span>
+      <button class="header-btn" onclick="createSession()" style="padding:1px 8px;font-size:10px" title="New session">+ New</button>
+    </div>
+    <div class="sidebar-content" id="sessionList"></div>
+    <div class="sidebar-title" style="border-top:1px solid var(--border)">Project</div>
     <div class="sidebar-content" id="fileTreeContent"><div class="file-tree-item">loading...</div></div>
   </div>
   <div class="chat-panel">
@@ -181,7 +198,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
     </div>
   </div>
   <div class="agent-panel" id="agentPanel">
-    <div class="agent-panel-title">Agents</div>
+    <div class="agent-panel-title"><span>Agents</span><span class="dot-count" id="agentCount">0 active</span></div>
     <div class="agent-list" id="agentList"></div>
   </div>
 </div>
@@ -224,15 +241,16 @@ function apiFetch(url,opts={}){
 document.getElementById('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 
 const agents=[
-  {id:'Orchestrator',name:'Cerebro',color:'#4c9aff'},
+  {id:'Orchestrator',name:'Cerebro',color:'#d97706'},
   {id:'Architect',name:'Visión',color:'#f0c85a'},
-  {id:'Editor',name:'Artífice',color:'#57d9a3'},
+  {id:'Editor',name:'Artífice',color:'#10b981'},
   {id:'Librarian',name:'Sabio',color:'#6ea8fe'},
   {id:'Basher',name:'Ejecutor',color:'#c084fc'},
   {id:'Researcher',name:'Explorador',color:'#4dabf7'},
   {id:'Thinker',name:'Estratega',color:'#ff922b'},
   {id:'Reviewer',name:'Juez',color:'#f783ac'},
 ];
+const agentLogs = {};
 
 let tokens=0,model='',isStreaming=false,streamMsg=null,currentController=null;
 const pendingQueue=[];
@@ -242,23 +260,179 @@ function renderAgentList(){
   const list=document.getElementById('agentList');list.innerHTML='';
   for(const a of agents){
     const el=document.createElement('div');el.className='agent-item';el.id='agent-'+a.id;
-    el.innerHTML='<div class="agent-dot" style="background:'+a.color+'"></div><span class="agent-label">'+a.name+'</span>';
+    el.innerHTML='<div class="agent-item-header"><div class="agent-dot" style="background:'+a.color+'"></div><span class="agent-label">'+a.name+'</span><div class="agent-bar"><div class="agent-bar-fill"></div></div></div><div class="agent-msg" id="agent-msg-'+a.id+'"></div><div class="agent-log" id="agent-log-'+a.id+'"></div>';
+    el.onclick=function(){this.classList.toggle('expanded');};
     list.appendChild(el);
+    agentLogs[a.id] = [];
   }
+  updateAgentCount();
 }
 renderAgentList();
 
+function updateAgentCount(){
+  const active=document.querySelectorAll('.agent-item.active').length;
+  document.getElementById('agentCount').textContent=active>0?active+' active':'idle';
+}
+
+function addAgentLog(id,msg){
+  if(!agentLogs[id])agentLogs[id]=[];
+  agentLogs[id].push(msg);
+  if(agentLogs[id].length>20)agentLogs[id]=agentLogs[id].slice(-20);
+  const logEl=document.getElementById('agent-log-'+id);
+  if(!logEl)return;
+  logEl.innerHTML=agentLogs[id].map(m=>'<div class="agent-log-entry">'+m+'</div>').join('');
+  logEl.scrollTop=logEl.scrollHeight;
+}
+
+// === SESSION MANAGEMENT ===
+let currentSessionId = '';
+let sessionsLoaded = false;
+
+function renderSessionItem(s, isActive) {
+  const el = document.createElement('div');
+  el.className = 'file-tree-item' + (isActive ? ' folder' : '');
+  el.style.display = 'flex';
+  el.style.justifyContent = 'space-between';
+  el.style.alignItems = 'center';
+  el.style.cursor = 'pointer';
+  el.style.padding = '4px 8px';
+  el.style.borderRadius = 'var(--radius)';
+  el.style.transition = 'all .1s';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = (isActive ? '>' : ' ') + ' ' + s.name;
+  nameSpan.style.flex = '1';
+  nameSpan.style.overflow = 'hidden';
+  nameSpan.style.textOverflow = 'ellipsis';
+  nameSpan.style.whiteSpace = 'nowrap';
+  nameSpan.style.fontSize = '11px';
+  nameSpan.style.color = isActive ? 'var(--accent)' : 'var(--dim)';
+  nameSpan.title = s.id;
+
+  const badge = document.createElement('span');
+  badge.textContent = s.messageCount;
+  badge.style.fontSize = '9px';
+  badge.style.color = 'var(--dim)';
+  badge.style.background = 'var(--surface)';
+  badge.style.padding = '0 5px';
+  badge.style.borderRadius = '8px';
+  badge.style.marginRight = '4px';
+
+  const delBtn = document.createElement('button');
+  delBtn.innerHTML = '&times;';
+  delBtn.style.cssText = 'background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;padding:0 4px;opacity:0;transition:opacity .15s';
+  delBtn.title = 'Delete session';
+
+  el.onmouseenter = () => { if (!isActive) delBtn.style.opacity = '1'; };
+  el.onmouseleave = () => delBtn.style.opacity = '0';
+  delBtn.onclick = (e) => { e.stopPropagation(); deleteSession(s.id); };
+
+  el.appendChild(nameSpan);
+  el.appendChild(badge);
+  if (!isActive) el.appendChild(delBtn);
+  if (!isActive) el.onclick = () => switchSession(s.id);
+  return el;
+}
+
+async function loadSessions() {
+  try {
+    const r = await apiFetch('/api/sessions');
+    if (!r.ok) return;
+    const d = await r.json();
+    const list = document.getElementById('sessionList');
+    list.innerHTML = '';
+    sessionsLoaded = true;
+    for (const s of d.sessions) {
+      if (s.active) currentSessionId = s.id;
+      const el = renderSessionItem(s, s.active);
+      list.appendChild(el);
+    }
+    if (d.sessions.length === 0) {
+      list.innerHTML = '<div class="file-tree-item" style="color:var(--dim);font-size:10px">No sessions</div>';
+    }
+  } catch (e) { /* session list failed */ }
+}
+
+async function switchSession(id) {
+  try {
+    const r = await apiFetch('/api/sessions/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!r.ok) { addMessage('Error switching session','system'); return; }
+    document.getElementById('messages').innerHTML = '';
+    document.getElementById('input').value = '';
+    currentSessionId = id;
+    tokens = 0;
+    updateStats();
+    loadSessions();
+  } catch (e) { addMessage('Session switch failed','system'); }
+}
+
+async function createSession() {
+  try {
+    const r = await apiFetch('/api/sessions/new', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Session ' + Date.now() }),
+    });
+    if (!r.ok) { addMessage('Error creating session','system'); return; }
+    const d = await r.json();
+    document.getElementById('messages').innerHTML = '<div class="msg system">New session created</div>';
+    currentSessionId = d.session?.id || '';
+    tokens = 0;
+    updateStats();
+    loadSessions();
+    // Auto-rename
+    const newName = prompt('Session name:', d.session?.name || 'New session');
+    if (newName) {
+      await apiFetch('/api/sessions/rename', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentSessionId, name: newName }),
+      });
+      loadSessions();
+    }
+  } catch (e) { addMessage('Session creation failed','system'); }
+}
+
+async function deleteSession(id) {
+  if (!confirm('Delete this session?')) return;
+  try {
+    const r = await apiFetch('/api/sessions/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!r.ok) { addMessage('Error deleting session','system'); return; }
+    addMessage('Session deleted','system');
+    loadSessions();
+  } catch (e) { addMessage('Session delete failed','system'); }
+}
+
+setTimeout(loadSessions, 500);
+
 function setAgentStatus(id,status,msg){
   const el=document.getElementById('agent-'+id);if(!el)return;
+  const msgEl=document.getElementById('agent-msg-'+id);
   if(agentDoneTimers[id]){clearTimeout(agentDoneTimers[id]);delete agentDoneTimers[id]}
   if(status==='action'||status==='active'||status==='thought'){
     el.className='agent-item active';
+    if(msgEl&&msg)msgEl.textContent=msg;
+    if(msg)addAgentLog(id,msg);
     updateWorkBanner(true,msg);
   }else if(status==='done'||status==='result'){
     el.className='agent-item done';
-    agentDoneTimers[id]=setTimeout(()=>{el.className='agent-item';updateWorkBanner(false)},3000);
+    if(msgEl)msgEl.textContent='';
+    agentDoneTimers[id]=setTimeout(()=>{
+      el.className='agent-item';
+      if(msgEl)msgEl.textContent='';
+      updateWorkBanner(false);
+      updateAgentCount();
+    },4000);
     updateWorkBanner(false);
   }else{el.className='agent-item'}
+  updateAgentCount();
 }
 
 function updateWorkBanner(show,msg){
@@ -404,6 +578,7 @@ function addToolMsg(agent,msg){
   const el=document.createElement('div');el.className='msg tool';
   el.textContent=(msg||'').slice(0,100);
   document.getElementById('messages').appendChild(el);
+  if(agent&&msg)addAgentLog(agent,msg);
 }
 function showTyping(show){
   const existing=document.getElementById('typing');

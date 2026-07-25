@@ -1,0 +1,46 @@
+{
+  "name": "ultron-desktop",
+  "version": "5.1.0",
+  "description": "ULTRON — Neural Intelligence Platform Desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
+    "build:all": "electron-builder --win --x64 --config.win.target=nsis"
+  },
+  "build": {
+    "appId": "com.ultron.desktop",
+    "productName": "ULTRON",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      { "from": "../dist/ultron.exe", "to": "ultron.exe" },
+      { "from": "../.env", "to": ".env" },
+      { "from": "../src/server/public", "to": "public" }
+    ],
+    "includeSubNodeModules": true,
+    "asar": false,
+    "compression": "maximum",
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "icon": "../src/server/public/favicon.ico"
+    },
+    "portable": {
+      "artifactName": "ULTRON-Portable-${version}.exe",
+      "splashImage": null
+    }
+  },
+  "devDependencies": {
+    "electron": "^35.7.5",
+    "electron-builder": "^25.0.0"
+  },
+  "allowScripts": {
+    "electron@35.7.5": true
+  }
+}
