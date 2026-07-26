@@ -4,12 +4,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ensureDir } from '../shared/utils';
+import { checkAccess, resolvePath } from './access-control';
 
 function safeResolve(projectDir: string, filePath: string): string {
-  const resolved = path.resolve(projectDir, filePath);
-  if (!resolved.startsWith(path.resolve(projectDir))) {
-    throw new Error(`Acceso denegado: ${filePath} esta fuera del directorio del proyecto`);
-  }
+  const { resolved, error } = resolvePath(filePath, projectDir);
+  if (error) throw new Error(error);
   return resolved;
 }
 

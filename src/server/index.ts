@@ -236,6 +236,22 @@ export function startWebServer(
       handleProjectSet(req, res);
       return;
     }
+    if (req.url === '/api/read' && req.method === 'GET') {
+      handleReadFile(req, res);
+      return;
+    }
+    if (req.url === '/api/write' && req.method === 'POST') {
+      handleWriteFile(req, res);
+      return;
+    }
+    if (req.url === '/api/skills/list' && req.method === 'GET') {
+      handleSkillsList(res);
+      return;
+    }
+    if (req.url === '/api/skills/install' && req.method === 'POST') {
+      handleSkillsInstall(req, res);
+      return;
+    }
     if (req.url === '/ws') {
       handleSSE(req, res);
       return;
@@ -620,6 +636,73 @@ export function startWebServer(
       }
       orchestrator.setProjectDir(resolved);
       safeJson(res, 200, { ok: true, projectDir: resolved });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
+  }
+
+  async function handleReadFile(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+      const file = url.searchParams.get('file');
+      if (!file) { safeJson(res, 400, { error: 'missing file' }); return; }
+      const { readFile } = await import('../tools/file');
+      const projectDir = orchestrator.getProjectDir();
+      const content = readFile(file, projectDir);
+      safeJson(res, 200, { ok: true, content, file });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function handleWriteFile(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(req);
+      const { file, content } = JSON.parse(body);
+      if (!file || content === undefined) { safeJson(res, 400, { error: 'missing file or content' }); return; }
+      const { writeFile } = await import('../tools/file');
+      const projectDir = orchestrator.getProjectDir();
+      const result = writeFile(file, content, projectDir);
+      safeJson(res, 200, { ok: true, path: result });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  function handleSkillsList(res: ServerResponse): void {
+    try {
+      const skills = orchestrator.getSkillsLoader().getAllSkills();
+      safeJson(res, 200, { skills: skills.map(s => ({ name: s.name, description: s.description, tools: s.tools })) });
+    } catch (e: unknown) {
+      safeJson(res, 200, { skills: [] });
+    }
+  }
+
+  async function handleSkillsInstall(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(req);
+      const { url } = JSON.parse(body);
+      if (!url) { safeJson(res, 400, { error: 'missing url' }); return; }
+      // Extract repo name from GitHub URL
+      const match = url.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+      if (!match) { safeJson(res, 400, { error: 'Invalid GitHub URL' }); return; }
+      const [, owner, repo] = match;
+      const repoName = repo.replace('.git', '');
+      // Create skills directory
+      const { execSync } = require('child_process');
+      const skillsDir = path.join(process.cwd(), '.opencode', 'skills', repoName);
+      if (fs.existsSync(skillsDir)) {
+        safeJson(res, 200, { ok: true, name: repoName, message: 'already installed' });
+        return;
+      }
+      try {
+        execSync(`git clone --depth 1 https://github.com/${owner}/${repoName}.git "${skillsDir}"`, { timeout: 30000, stdio: 'pipe' });
+        // Reload skills
+        await orchestrator.getSkillsLoader().loadAll();
+        safeJson(res, 200, { ok: true, name: repoName });
+      } catch (e) {
+        safeJson(res, 500, { error: 'Failed to clone repository. Make sure git is installed and the URL is correct.' });
+      }
     } catch (e: unknown) {
       safeJson(res, 500, { error: String(e) });
     }

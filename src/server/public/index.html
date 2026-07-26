@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ULTRON</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
 :root{--bg:#1a1b1e;--sidebar-bg:#1e1f23;--surface:#25262b;--border:#2f3035;--hover:#2c2d31;--accent:#4c9aff;--accent-dim:rgba(76,154,255,.12);--text:#c9ccd3;--dim:#6b6e78;--bright:#e4e6ea;--success:#57d9a3;--warn:#f0c85a;--error:#f97083;--font:Inter,system-ui,-apple-system,sans-serif;--mono:'JetBrains Mono',monospace;--radius:4px}
@@ -116,6 +117,33 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .status-bar .bar-item{display:flex;align-items:center;gap:4px}
 .status-bar .bar-val{color:var(--text)}
 
+#editorOverlay{display:none;position:fixed;inset:0;z-index:500;background:var(--bg);flex-direction:column}
+#editorOverlay.show{display:flex}
+#editorHeader{display:flex;align-items:center;padding:4px 12px;height:32px;background:var(--sidebar-bg);border-bottom:1px solid var(--border);gap:8px;flex-shrink:0}
+#editorHeader .filelabel{font-size:11px;color:var(--accent);font-family:var(--mono);flex:1}
+#editorHeader .filepath{font-size:9px;color:var(--dim);font-family:var(--mono)}
+#editorContainer{flex:1}
+#diffContainer{display:none;flex:1}
+#diffContainer.show{display:block}
+#editorClose{background:none;border:1px solid var(--border);color:var(--dim);padding:2px 10px;border-radius:var(--radius);cursor:pointer;font-size:10px;font-family:var(--mono)}
+#editorClose:hover{color:var(--text);background:var(--hover)}
+#diffToggle{background:none;border:1px solid var(--border);color:var(--dim);padding:2px 10px;border-radius:var(--radius);cursor:pointer;font-size:10px;font-family:var(--mono)}
+#diffToggle:hover{color:var(--text);background:var(--hover)}
+#editorSave{background:none;border:1px solid var(--success);color:var(--success);padding:2px 10px;border-radius:var(--radius);cursor:pointer;font-size:10px;font-family:var(--mono)}
+#editorSave:hover{background:rgba(87,217,163,.1)}
+
+#pluginPanel{display:none;position:fixed;top:36px;right:8px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;width:380px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+#pluginPanel.show{display:block}
+#pluginPanel h3{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;font-family:var(--mono)}
+.plugin-item{padding:8px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px}
+.plugin-item .pname{font-size:11px;color:var(--text);font-family:var(--mono)}
+.plugin-item .pdesc{font-size:9px;color:var(--dim);margin-top:2px}
+.plugin-item .pstatus{font-size:8px;color:var(--success);margin-top:4px}
+.plugin-install-input{display:flex;gap:6px;margin-bottom:12px}
+.plugin-install-input input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text);font-size:10px;outline:none;font-family:var(--mono)}
+.plugin-install-input input:focus{border-color:var(--accent)}
+.plugin-install-input button{background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:10px;font-family:var(--mono)}
+
 #validateBanner{display:none;position:fixed;top:36px;left:0;right:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--accent);padding:8px 16px;align-items:center;gap:12px}
 #validateBanner.show{display:flex}
 #validateBannerBar{flex:1;height:2px;background:var(--border);border-radius:2px;overflow:hidden}
@@ -170,6 +198,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
   <h3 style="margin-top:14px">Providers</h3>
   <div id="providerList" style="font-size:10px;color:var(--dim)">Loading...</div>
 </div>
+<div id="editorOverlay">
+  <div id="editorHeader">
+    <span class="filelabel" id="editorFileLabel">file.ts</span>
+    <span class="filepath" id="editorFilePath">path/to/file</span>
+    <button id="diffToggle" onclick="toggleDiff()">Diff</button>
+    <button id="editorSave" onclick="saveEditorFile()">Save</button>
+    <button id="editorClose" onclick="closeEditor()">Close</button>
+  </div>
+  <div id="editorContainer"></div>
+  <div id="diffContainer"></div>
+</div>
+
+<div id="pluginPanel">
+  <h3>Plugins / Skills</h3>
+  <div class="plugin-install-input">
+    <input id="pluginUrl" placeholder="GitHub URL or npm package...">
+    <button onclick="installPlugin()">Install</button>
+  </div>
+  <div id="pluginList">Loading...</div>
+</div>
+
 <div class="header">
   <div class="header-left">
     <span class="logo"><span>U</span>LTRON</span>
@@ -179,6 +228,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
     <span class="header-badge" id="headerStats"><span>0</span> tk</span>
     <select class="model-select" id="modelSelect"><option>...</option></select>
     <button class="header-btn" id="testBtn" onclick="testModels()">Test</button>
+    <button class="header-btn" onclick="togglePlugins()" title="Plugins">&#x25A8;</button>
     <button class="header-btn" id="settingsBtn" onclick="toggleSettings()" title="Settings">&#x2699;</button>
   </div>
 </div>
@@ -709,6 +759,125 @@ setTimeout(loadFileTree,1000);
 setTimeout(loadProjectDir,1000);
 
 document.getElementById('input').focus();
+
+// === MONACO EDITOR ===
+let monacoEditor = null;
+let monacoDiff = null;
+let editorFile = null;
+let editorOrigContent = '';
+
+function requireMonaco(cb) {
+  if (typeof monaco !== 'undefined') { cb(); return; }
+  require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
+  require(['vs/editor/editor.main'], cb);
+}
+
+function openEditor(filename, content, filepath) {
+  editorFile = { filename, content, filepath };
+  editorOrigContent = content;
+  document.getElementById('editorFileLabel').textContent = filename || 'untitled';
+  document.getElementById('editorFilePath').textContent = filepath || '';
+  document.getElementById('editorOverlay').classList.add('show');
+  document.getElementById('diffContainer').classList.remove('show');
+  document.getElementById('editorContainer').style.display = 'block';
+
+  requireMonaco(() => {
+    if (monacoEditor) monacoEditor.dispose();
+    const ext = filename ? filename.split('.').pop() : 'txt';
+    const lang = ({ ts:'typescript', tsx:'typescript', js:'javascript', jsx:'javascript', py:'python', json:'json', md:'markdown', html:'html', css:'css', kt:'kotlin', java:'java', rs:'rust', go:'go', yml:'yaml', yaml:'yaml', xml:'xml', sql:'sql', sh:'shell', bash:'shell' })[ext] || 'plaintext';
+    monacoEditor = monaco.editor.create(document.getElementById('editorContainer'), {
+      value: content, language: lang, theme: 'vs-dark',
+      fontSize: 13, fontFamily: '"JetBrains Mono", monospace',
+      minimap: { enabled: false }, scrollBeyondLastLine: false,
+      automaticLayout: true, wordWrap: 'on', tabSize: 2,
+      renderWhitespace: 'selection',
+    });
+  });
+}
+
+function closeEditor() {
+  document.getElementById('editorOverlay').classList.remove('show');
+  if (monacoEditor) { monacoEditor.dispose(); monacoEditor = null; }
+  if (monacoDiff) { monacoDiff.dispose(); monacoDiff = null; }
+}
+
+function saveEditorFile() {
+  if (!monacoEditor || !editorFile) return;
+  const newContent = monacoEditor.getValue();
+  if (newContent === editorOrigContent) { addMessage('No changes to save','system'); return; }
+  apiFetch('/api/write', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({file:editorFile.filepath||editorFile.filename, content:newContent}) })
+    .then(r => { if(r.ok) { addMessage('Saved: '+editorFile.filename,'system'); editorOrigContent = newContent; } else addMessage('Save failed','system'); })
+    .catch(() => addMessage('Save failed','system'));
+}
+
+function showDiff(original, modified, filename) {
+  document.getElementById('editorFileLabel').textContent = 'Diff: ' + (filename||'file');
+  document.getElementById('editorContainer').style.display = 'none';
+  document.getElementById('diffContainer').classList.add('show');
+  document.getElementById('editorOverlay').classList.add('show');
+  requireMonaco(() => {
+    if (monacoDiff) monacoDiff.dispose();
+    const ext = filename ? filename.split('.').pop() : 'txt';
+    const lang = ({ ts:'typescript', tsx:'typescript', js:'javascript' })[ext] || 'plaintext';
+    const orig = monaco.editor.createModel(original, lang);
+    const mod = monaco.editor.createModel(modified, lang);
+    monacoDiff = monaco.editor.createDiffEditor(document.getElementById('diffContainer'), {
+      theme: 'vs-dark', fontSize: 12, fontFamily: '"JetBrains Mono", monospace',
+      minimap: { enabled: false }, renderSideBySide: true, automaticLayout: true,
+    });
+    monacoDiff.setModel({ original: orig, modified: mod });
+  });
+}
+
+function toggleDiff() {
+  const dc = document.getElementById('diffContainer');
+  const ec = document.getElementById('editorContainer');
+  if (dc.classList.contains('show')) {
+    dc.classList.remove('show'); ec.style.display = 'block';
+  } else if (monacoEditor) {
+    ec.style.display = 'none'; dc.classList.add('show');
+    if (!monacoDiff) showDiff(editorOrigContent, monacoEditor.getValue(), editorFile?.filename);
+  }
+}
+
+// === PLUGIN SYSTEM ===
+function togglePlugins() {
+  const p = document.getElementById('pluginPanel');
+  p.classList.toggle('show');
+  if (p.classList.contains('show')) loadPlugins();
+}
+
+async function loadPlugins() {
+  try {
+    const r = await apiFetch('/api/skills/list');
+    const d = await r.json();
+    const list = document.getElementById('pluginList');
+    if (!d.skills || d.skills.length === 0) { list.innerHTML = '<div style="font-size:10px;color:var(--dim)">No plugins installed. Enter a GitHub URL above.</div>'; return; }
+    list.innerHTML = d.skills.map(s => '<div class="plugin-item"><div class="pname">'+esc(s.name)+'</div><div class="pdesc">'+esc(s.description||'')+'</div><div class="pstatus">&#x2713; installed</div></div>').join('');
+  } catch { document.getElementById('pluginList').innerHTML = '<div style="font-size:10px;color:var(--dim)">Could not load plugins</div>'; }
+}
+
+async function installPlugin() {
+  const url = document.getElementById('pluginUrl').value.trim();
+  if (!url) return;
+  document.getElementById('pluginUrl').value = '';
+  try {
+    const r = await apiFetch('/api/skills/install', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+    const d = await r.json();
+    addMessage(d.ok ? 'Plugin installed: ' + d.name : 'Install failed: ' + (d.error||''), 'system');
+    loadPlugins();
+  } catch { addMessage('Plugin install failed','system'); }
+}
+
+// Override formatResponse to add code viewer buttons
+const origFormatResponse = formatResponse;
+formatResponse = function(text) {
+  return origFormatResponse(text).replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, function(match, code) {
+    const id = 'code_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    const lang = match.includes('language-') ? match.match(/language-(\w+)/)[1] : '';
+    return '<div style="position:relative"><button onclick="openEditor(\'code.'+lang+'\',`'+code.replace(/`/g,'\\`').replace(/\$/g,'\\$')+'`)" style="position:absolute;top:4px;right:4px;background:var(--accent);color:#fff;border:none;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:9px;font-family:var(--mono);z-index:10">Open in Editor</button><pre><code>'+code+'</code></pre></div>';
+  });
+};
 
 // === SETTINGS ===
 const DEFAULT_SETTINGS = {
