@@ -30,6 +30,7 @@ import * as fileTools from '../tools/file';
 import { executeCommand } from '../tools/execute';
 import { sandboxedExec, getSandboxConfig, setSandboxMode, allowAll, addAllow } from '../tools/sandbox';
 import { filterPrivateInfo } from '../memory/privacy';
+import { SharedContext } from '../memory/shared-context';
 import { log } from '../shared/logger';
 
 const SUMMARIZE_EVERY = 12;
@@ -102,6 +103,7 @@ export class Orchestrator {
   private agentStates: Map<string, { status: string; message: string; history: Array<{ time: string; text: string }>; lastActive: number }> = new Map();
   private activeController: AbortController | null = null;
   private sharedContext: Map<string, unknown> = new Map();
+  private ctx: SharedContext;
 
   setAgentModel(agentName: string, modelId: string): void {
     this.agentModels.set(agentName.toLowerCase(), modelId);
@@ -157,6 +159,7 @@ export class Orchestrator {
   getSkillsLoader(): SkillsLoader { return this.skillsLoader; }
   getUltronConfig(): UltronConfigStore { return this.ultronConfig; }
   getSessionManager(): SessionManager { return this.sessionManager; }
+  getSharedContext(): SharedContext { return this.ctx; }
   getProjectDir(): string { return this.config.projectDir; }
   setProjectDir(dir: string): void {
     this.config.projectDir = dir;
@@ -197,6 +200,7 @@ export class Orchestrator {
     this.graphMemory = new GraphMemoryBridge(config.projectDir);
     this.mcpServer = new MCPServer(this);
     this.skillsLoader = new SkillsLoader(this.ultronConfig.getSkills().dirs);
+    this.ctx = new SharedContext(this.sessionManager.getActiveId());
 
     // Connect sub-agent event emitters to forward events
     const forwardEvent = (event: AgentEvent) => {
@@ -395,7 +399,9 @@ export class Orchestrator {
     }
 
     const skillsCtx = this.skillsLoader.getSystemPrompt();
-    const sp = buildSystemPrompt(this.vault, this.session, this.configStore, this.config.projectDir, graphCtx, skillsCtx).slice(0, 5000);
+    const sharedCtx = this.ctx.toPromptContext();
+    const combinedCtx = skillsCtx + '\n\n' + sharedCtx;
+    const sp = buildSystemPrompt(this.vault, this.session, this.configStore, this.config.projectDir, graphCtx, combinedCtx).slice(0, 5000);
     this.stream('');
     const msgs: ChatMessage[] = [{ role: 'system', content: sp }, ...this.conversation.slice(-6), { role: 'user', content: input }];
     const tools = this.getTools();
@@ -544,12 +550,30 @@ export class Orchestrator {
 
     const toolAgent = agentForTool(name);
     const isDelegation = name.startsWith('delegate_');
+
+    // Track in shared context
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     if (isDelegation) {
+      this.ctx.addTask(toolAgent, (args.task || args.content || '').toString(), taskId);
       this.emit({ type: 'delegate', agent: 'Orchestrator', displayName: 'Cerebro', message: `→ ${displayName(toolAgent)}: ${(args.task || args.content || '').toString().slice(0, 80)}`, data: { to: toolAgent, task: args } });
     }
+
+    // Add shared context to delegation tasks so sub-agents can see what's been done
+    if (isDelegation && typeof args.task === 'string') {
+      const ctxSummary = this.ctx.toPromptContext();
+      args.task = args.task + '\n\n' + ctxSummary;
+    }
+
     this.emit({ type: 'action', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args), data: args });
     log.tool(name, args, 'executing');
     const { result, retries } = await executeTool(name, args, this.config.projectDir, this.editor, this.librarian, this.basher, this.researcher, this.thinker, this.reviewer, this.architect);
+
+    // Track results
+    if (name === 'read_file') this.ctx.recordReadFile(args.filePath as string, result);
+    if (name === 'write_file') this.ctx.recordWrittenFile(args.filePath as string, args.content as string);
+    if (name === 'direct_execute') this.ctx.recordCommand(args.command as string, result, this.config.projectDir);
+    if (isDelegation) this.ctx.completeTask(taskId, result);
+
     if (name === 'vault_save') this.vault.writeNote(args.name as string, args.content as string);
     log.tool(name, args, result.slice(0, 200));
     this.emit({ type: 'done', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args) + ' → ✓', data: { result: result.slice(0, 200) } });
