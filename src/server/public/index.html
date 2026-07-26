@@ -662,7 +662,7 @@ async function doSend(text){
               else if(ev.type==='action'){setAgentStatus(ev.agent,'action',ev.message,ev.data);addToolMsg(ev.agent,ev.message)}
               else if(ev.type==='done'){setAgentStatus(ev.agent,'done',ev.message,ev.data)}
               else if(ev.type==='thought'){setAgentStatus(ev.agent,'thought',ev.message||'',ev.data)}
-            }else if(d.type==='result'){if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);tokens=d.tokens?.tokens||0;updateStats();streamMsg=null;streamRawText=''}
+            }else if(d.type==='result'){if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);playChime();tokens=d.tokens?.tokens||0;updateStats();streamMsg=null;streamRawText=''}
             else if(d.type==='error'){showTyping(false);addMessage('Error: '+d.error,'assistant')}
           }catch(e){}
         }
@@ -690,14 +690,16 @@ function finishSend(){
   }
 }
 
+let audioCtx=null;
 function playChime(){
   try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    const g=ctx.createGain();g.connect(ctx.destination);g.gain.value=0.08;
-    const o=ctx.createOscillator();o.type='sine';o.connect(g);
-    o.frequency.setValueAtTime(880,ctx.currentTime);
-    o.frequency.setValueAtTime(1108,ctx.currentTime+0.08);
-    o.start(ctx.currentTime);o.stop(ctx.currentTime+0.15);
+    if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    const g=audioCtx.createGain();g.connect(audioCtx.destination);g.gain.value=0.1;
+    const o=audioCtx.createOscillator();o.type='sine';o.connect(g);
+    o.frequency.setValueAtTime(880,audioCtx.currentTime);
+    o.frequency.setValueAtTime(1108,audioCtx.currentTime+0.08);
+    o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+0.15);
   }catch(e){}
 }
 function addMessage(text,type){
