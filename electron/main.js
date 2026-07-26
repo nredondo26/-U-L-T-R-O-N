@@ -43,7 +43,9 @@ function startServer() {
   const info = getServerPath();
   if (!info) return false;
 
-  const args = info.args || ['--serve', '--port', String(PORT), '--bind', '127.0.0.1'];
+  const userDir = require('path').join(require('os').homedir(), 'Documents');
+  const vaultDir = require('path').join(require('os').homedir(), '.ultron', 'vault');
+  const args = info.args || ['--serve', '--project', userDir, '--vault', vaultDir, '--port', String(PORT), '--bind', '127.0.0.1'];
 
   const env = { ...process.env, NODE_ENV: 'production' };
 

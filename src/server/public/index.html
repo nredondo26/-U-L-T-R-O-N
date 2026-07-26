@@ -80,30 +80,36 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .stop-btn{background:transparent;color:var(--error);border:1px solid var(--error);border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:11px;font-family:var(--mono);white-space:nowrap;display:none;height:30px}
 .stop-btn:hover{background:rgba(249,112,131,.1)}
 
-.agent-panel{width:240px;background:var(--sidebar-bg);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.agent-panel{width:260px;background:var(--sidebar-bg);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
 .agent-panel-title{padding:8px 12px;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
 .agent-panel-title .dot-count{font-size:9px;color:var(--dim);font-family:var(--mono)}
 .agent-list{flex:1;overflow-y:auto;padding:4px}
 .agent-item{padding:4px 8px;border-radius:var(--radius);margin:1px 0;transition:all .15s;cursor:pointer;display:flex;flex-direction:column;gap:2px;font-size:11px;border:1px solid transparent}
 .agent-item:hover{background:var(--hover);border-color:var(--border)}
 .agent-item.active{background:var(--accent-dim);border-color:var(--accent)}
-.agent-item.done{opacity:.7}
-.agent-item-header{display:flex;align-items:center;gap:6px;width:100%}
-.agent-item .agent-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--dim);transition:all .3s}
+.agent-item.done{opacity:.6}
+.agent-item.delegate{background:rgba(240,200,90,.08);border-color:var(--warn)}
+.agent-item-header{display:flex;align-items:center;gap:4px;width:100%}
+.agent-item .agent-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--dim);transition:all .3s;position:relative}
 .agent-item.active .agent-dot{background:var(--accent);box-shadow:0 0 6px var(--accent)}
-.agent-item .agent-bar{height:2px;flex:1;background:var(--border);border-radius:2px;overflow:hidden;opacity:0;transition:opacity .3s}
+.agent-item.delegate .agent-dot{background:var(--warn)}
+.agent-item .agent-bar{height:2px;flex:0 0 40px;background:var(--border);border-radius:2px;overflow:hidden;opacity:0;transition:opacity .3s;margin-left:auto}
 .agent-item.active .agent-bar{opacity:1}
 .agent-item .agent-bar-fill{height:100%;background:var(--accent);border-radius:2px;animation:barScan 1.5s ease-in-out infinite;width:30%}
-@keyframes barScan{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
-.agent-item .agent-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:10px;color:var(--dim)}
+@keyframes barScan{0%{transform:translateX(-100%)}100%{transform:translateX(500%)}}
+.agent-item .agent-label{flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:10px;color:var(--dim);max-width:60px}
 .agent-item.active .agent-label{color:var(--bright)}
 .agent-item.done .agent-label{color:var(--success)}
+.agent-item .agent-tool{font-size:8px;color:var(--dim);font-family:var(--mono);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;padding-right:4px}
+.agent-item.active .agent-tool{color:var(--accent)}
 .agent-item .agent-msg{font-size:9px;color:var(--dim);font-family:var(--mono);padding-left:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-height:0;transition:all .3s}
 .agent-item.active .agent-msg{max-height:20px;color:var(--accent)}
 .agent-item.done .agent-msg{max-height:0}
 .agent-item .agent-log{font-size:8px;color:var(--dim);font-family:var(--mono);padding-left:14px;max-height:0;overflow:hidden;transition:max-height .3s;border-left:1px solid var(--border);margin-top:2px}
-.agent-item.expanded .agent-log{max-height:100px;overflow-y:auto}
-.agent-log-entry{padding:1px 4px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-item.expanded .agent-log{max-height:150px;overflow-y:auto}
+.agent-log-entry{padding:2px 4px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px}
+.agent-log-entry.result{opacity:1;color:var(--success)}
+.agent-log-entry.delegate{opacity:1;color:var(--warn);font-style:italic}
 .agent-log-entry:last-child{opacity:1;color:var(--text)}
 
 .status-bar{display:flex;align-items:center;padding:0 12px;height:22px;background:var(--sidebar-bg);border-top:1px solid var(--border);gap:16px;flex-shrink:0;font-size:10px;font-family:var(--mono);color:var(--dim)}
@@ -184,6 +190,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
     </div>
     <div class="sidebar-content" id="sessionList"></div>
     <div class="sidebar-title" style="border-top:1px solid var(--border)">Project</div>
+    <div class="sidebar-content" id="projectDirContent" style="font-size:9px;color:var(--dim);padding:4px 8px;word-break:break-all"></div>
     <div class="sidebar-content" id="fileTreeContent"><div class="file-tree-item">loading...</div></div>
   </div>
   <div class="chat-panel">
@@ -260,7 +267,7 @@ function renderAgentList(){
   const list=document.getElementById('agentList');list.innerHTML='';
   for(const a of agents){
     const el=document.createElement('div');el.className='agent-item';el.id='agent-'+a.id;
-    el.innerHTML='<div class="agent-item-header"><div class="agent-dot" style="background:'+a.color+'"></div><span class="agent-label">'+a.name+'</span><div class="agent-bar"><div class="agent-bar-fill"></div></div></div><div class="agent-msg" id="agent-msg-'+a.id+'"></div><div class="agent-log" id="agent-log-'+a.id+'"></div>';
+    el.innerHTML='<div class="agent-item-header"><div class="agent-dot" style="background:'+a.color+'"></div><span class="agent-label">'+a.name+'</span><span class="agent-tool" id="agent-tool-'+a.id+'"></span><div class="agent-bar"><div class="agent-bar-fill"></div></div></div><div class="agent-msg" id="agent-msg-'+a.id+'"></div><div class="agent-log" id="agent-log-'+a.id+'"></div>';
     el.onclick=function(){this.classList.toggle('expanded');};
     list.appendChild(el);
     agentLogs[a.id] = [];
@@ -271,16 +278,18 @@ renderAgentList();
 
 function updateAgentCount(){
   const active=document.querySelectorAll('.agent-item.active').length;
-  document.getElementById('agentCount').textContent=active>0?active+' active':'idle';
+  const delegating=document.querySelectorAll('.agent-item.delegate').length;
+  const total=active+delegating;
+  document.getElementById('agentCount').textContent=total>0?total+' active':'idle';
 }
 
-function addAgentLog(id,msg){
+function addAgentLog(id,msg,cls){
   if(!agentLogs[id])agentLogs[id]=[];
-  agentLogs[id].push(msg);
-  if(agentLogs[id].length>20)agentLogs[id]=agentLogs[id].slice(-20);
+  agentLogs[id].push({text:msg,cls:cls||''});
+  if(agentLogs[id].length>30)agentLogs[id]=agentLogs[id].slice(-30);
   const logEl=document.getElementById('agent-log-'+id);
   if(!logEl)return;
-  logEl.innerHTML=agentLogs[id].map(m=>'<div class="agent-log-entry">'+m+'</div>').join('');
+  logEl.innerHTML=agentLogs[id].map(m=>'<div class="agent-log-entry '+m.cls+'">'+esc(m.text)+'</div>').join('');
   logEl.scrollTop=logEl.scrollHeight;
 }
 
@@ -445,24 +454,44 @@ async function deleteSession(id) {
 
 setTimeout(loadSessions, 500);
 
-function setAgentStatus(id,status,msg){
+function setAgentStatus(id,status,msg,data){
   const el=document.getElementById('agent-'+id);if(!el)return;
   const msgEl=document.getElementById('agent-msg-'+id);
+  const toolEl=document.getElementById('agent-tool-'+id);
   if(agentDoneTimers[id]){clearTimeout(agentDoneTimers[id]);delete agentDoneTimers[id]}
-  if(status==='action'||status==='active'||status==='thought'){
+
+  if(status==='delegate'){
+    el.className='agent-item delegate';
+    if(toolEl)toolEl.textContent='→';
+    if(msgEl&&msg)msgEl.textContent=msg.slice(0,60);
+    if(msg)addAgentLog(id,msg,'delegate');
+    updateWorkBanner(true,msg);
+  }else if(status==='action'||status==='active'){
     el.className='agent-item active';
-    if(msgEl&&msg)msgEl.textContent=msg;
+    if(toolEl&&data&&data.command)toolEl.textContent=(data.command+'').slice(0,25);
+    else if(toolEl&&data&&data.filePath)toolEl.textContent=(data.filePath+'').slice(0,25);
+    else if(toolEl&&data&&data.task)toolEl.textContent='task';
+    else if(toolEl&&msg)toolEl.textContent=msg.slice(0,25);
+    if(msgEl&&msg)msgEl.textContent=msg.slice(0,60);
     if(msg)addAgentLog(id,msg);
+    updateWorkBanner(true,msg);
+  }else if(status==='thought'){
+    el.className='agent-item active';
+    if(toolEl)toolEl.textContent='...';
+    if(msgEl&&msg)msgEl.textContent=msg.slice(0,60);
     updateWorkBanner(true,msg);
   }else if(status==='done'||status==='result'){
     el.className='agent-item done';
+    if(toolEl)toolEl.textContent='✓';
     if(msgEl)msgEl.textContent='';
+    if(data&&data.result)addAgentLog(id,'→ '+data.result.slice(0,100),'result');
     agentDoneTimers[id]=setTimeout(()=>{
       el.className='agent-item';
+      if(toolEl)toolEl.textContent='';
       if(msgEl)msgEl.textContent='';
       updateWorkBanner(false);
       updateAgentCount();
-    },4000);
+    },5000);
     updateWorkBanner(false);
   }else{el.className='agent-item'}
   updateAgentCount();
@@ -527,7 +556,12 @@ es.addEventListener('validate',e=>{
   }catch(e){}
 });
 es.addEventListener('event',e=>{
-  try{const d=JSON.parse(e.data);if(d.type==='action'||d.type==='thought')setAgentStatus(d.agent,d.type,d.message);else if(d.type==='done')setAgentStatus(d.agent,'done','')}catch(e){}
+  try{const d=JSON.parse(e.data);
+    if(d.type==='delegate')setAgentStatus(d.agent,'delegate',d.message,d.data);
+    else if(d.type==='action')setAgentStatus(d.agent,'action',d.message,d.data);
+    else if(d.type==='thought')setAgentStatus(d.agent,'thought',d.message,d.data);
+    else if(d.type==='done')setAgentStatus(d.agent,'done',d.message,d.data);
+  }catch(e){}
 });
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
@@ -574,9 +608,10 @@ async function doSend(text){
               streamMsg.innerHTML=safeMD(streamRawText);streamMsg.scrollIntoView(false);
             }else if(d.type==='event'&&d.data){
               const ev=d.data;
-              if(ev.type==='action'){setAgentStatus(ev.agent,'action',ev.message);addToolMsg(ev.agent,ev.message)}
-              else if(ev.type==='done')setAgentStatus(ev.agent,'done','')
-              else if(ev.type==='thought')setAgentStatus(ev.agent,'thought',ev.message||'')
+              if(ev.type==='delegate'){setAgentStatus(ev.agent,'delegate',ev.message,ev.data);addToolMsg(ev.agent,ev.message)}
+              else if(ev.type==='action'){setAgentStatus(ev.agent,'action',ev.message,ev.data);addToolMsg(ev.agent,ev.message)}
+              else if(ev.type==='done'){setAgentStatus(ev.agent,'done',ev.message,ev.data)}
+              else if(ev.type==='thought'){setAgentStatus(ev.agent,'thought',ev.message||'',ev.data)}
             }else if(d.type==='result'){if(streamMsg&&streamRawText)streamMsg.innerHTML=safeMD(streamRawText);tokens=d.tokens?.tokens||0;updateStats();streamMsg=null;streamRawText=''}
             else if(d.type==='error'){showTyping(false);addMessage('Error: '+d.error,'assistant')}
           }catch(e){}
@@ -642,17 +677,36 @@ async function testModels(){
   input.value=was;setTimeout(()=>document.getElementById('testBtn').textContent='Test',3000);
 }
 
+// Project directory
+async function loadProjectDir(){
+  try{
+    const r=await apiFetch('/api/project');
+    if(!r.ok)return;
+    const d=await r.json();
+    const el=document.getElementById('projectDirContent');
+    if(el)el.innerHTML='<div style="display:flex;align-items:center;gap:4px"><span style="flex:1;overflow:hidden;text-overflow:ellipsis">'+esc(d.projectDir)+'</span><button onclick="changeProjectDir()" style="background:none;border:1px solid var(--border);color:var(--dim);cursor:pointer;font-size:8px;padding:1px 4px;border-radius:2px">Edit</button></div>';
+  }catch(e){}
+}
+
+function changeProjectDir(){
+  const dir=prompt('Project directory:');
+  if(!dir)return;
+  apiFetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir})})
+    .then(r=>{if(r.ok){loadProjectDir();addMessage('Project dir changed','system')}else{addMessage('Invalid directory','system')}})
+    .catch(()=>addMessage('Failed to change project dir','system'));
+}
+
 // File tree
 async function loadFileTree(){
   try{
     const r=await apiFetch('/api/status');
     if(!r.ok)return;
     const tree=document.getElementById('fileTreeContent');
-    // Simple: just show a note about /index command
     tree.innerHTML='<div class="file-tree-item folder">project/</div><div class="file-tree-item" style="padding-left:16px;color:var(--dim)">Usa /index para analizar</div><div class="file-tree-item" style="padding-left:16px;color:var(--dim)">@archivo para leer</div>';
   }catch(e){}
 }
 setTimeout(loadFileTree,1000);
+setTimeout(loadProjectDir,1000);
 
 document.getElementById('input').focus();
 

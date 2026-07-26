@@ -228,6 +228,14 @@ export function startWebServer(
       handleSessionAutoName(req, res);
       return;
     }
+    if (req.url === '/api/project' && req.method === 'GET') {
+      handleProjectGet(res);
+      return;
+    }
+    if (req.url === '/api/project' && req.method === 'POST') {
+      handleProjectSet(req, res);
+      return;
+    }
     if (req.url === '/ws') {
       handleSSE(req, res);
       return;
@@ -588,6 +596,30 @@ export function startWebServer(
       const name = message.slice(0, 60).trim();
       sm.renameSession(id, name || 'Chat');
       safeJson(res, 200, { ok: true, name });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
+  }
+
+  function handleProjectGet(res: ServerResponse): void {
+    try {
+      safeJson(res, 200, { projectDir: orchestrator.getProjectDir() });
+    } catch (e: unknown) {
+      safeJson(res, 500, { error: String(e) });
+    }
+  }
+
+  async function handleProjectSet(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(req);
+      const { dir } = JSON.parse(body);
+      if (!dir) { safeJson(res, 400, { error: 'missing dir' }); return; }
+      const resolved = path.resolve(dir);
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+        safeJson(res, 400, { error: 'directory not found' }); return;
+      }
+      orchestrator.setProjectDir(resolved);
+      safeJson(res, 200, { ok: true, projectDir: resolved });
     } catch (e: unknown) {
       safeJson(res, 500, { error: String(e) });
     }

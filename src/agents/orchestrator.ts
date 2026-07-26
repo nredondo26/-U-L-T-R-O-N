@@ -157,6 +157,15 @@ export class Orchestrator {
   getSkillsLoader(): SkillsLoader { return this.skillsLoader; }
   getUltronConfig(): UltronConfigStore { return this.ultronConfig; }
   getSessionManager(): SessionManager { return this.sessionManager; }
+  getProjectDir(): string { return this.config.projectDir; }
+  setProjectDir(dir: string): void {
+    this.config.projectDir = dir;
+    this.editor = new EditorAgent(dir);
+    this.librarian = new LibrarianAgent(dir);
+    this.basher = new BasherAgent(dir);
+    this.graphLearner = new GraphLearner(this.vault, dir);
+    log.info('Project dir changed', { dir });
+  }
 
   saveCurrentConversation(): void {
     const activeId = this.sessionManager.getActiveId();
@@ -188,6 +197,17 @@ export class Orchestrator {
     this.graphMemory = new GraphMemoryBridge(config.projectDir);
     this.mcpServer = new MCPServer(this);
     this.skillsLoader = new SkillsLoader(this.ultronConfig.getSkills().dirs);
+
+    // Connect sub-agent event emitters to forward events
+    const forwardEvent = (event: AgentEvent) => {
+      this.emit(event);
+    };
+    this.editor.setEventEmitter(forwardEvent);
+    this.librarian.setEventEmitter(forwardEvent);
+    this.basher.setEventEmitter(forwardEvent);
+    this.researcher.setEventEmitter(forwardEvent);
+    this.thinker.setEventEmitter(forwardEvent);
+    this.reviewer.setEventEmitter(forwardEvent);
 
     this.initSubsystems();
 
@@ -523,12 +543,16 @@ export class Orchestrator {
     }
 
     const toolAgent = agentForTool(name);
+    const isDelegation = name.startsWith('delegate_');
+    if (isDelegation) {
+      this.emit({ type: 'delegate', agent: 'Orchestrator', displayName: 'Cerebro', message: `→ ${displayName(toolAgent)}: ${(args.task || args.content || '').toString().slice(0, 80)}`, data: { to: toolAgent, task: args } });
+    }
     this.emit({ type: 'action', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args), data: args });
     log.tool(name, args, 'executing');
     const { result, retries } = await executeTool(name, args, this.config.projectDir, this.editor, this.librarian, this.basher, this.researcher, this.thinker, this.reviewer, this.architect);
     if (name === 'vault_save') this.vault.writeNote(args.name as string, args.content as string);
     log.tool(name, args, result.slice(0, 200));
-    this.emit({ type: 'done', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args) + ' → ✓' });
+    this.emit({ type: 'done', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args) + ' → ✓', data: { result: result.slice(0, 200) } });
     return { result, retries };
   }
 
