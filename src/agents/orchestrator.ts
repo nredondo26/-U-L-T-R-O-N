@@ -442,10 +442,27 @@ export class Orchestrator {
         } else { out = resp.content || 'OK'; break; }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        this.currentModel = getProviders()[0]?.defaultModel || 'deepseek-chat';
-        this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: `Error: ${msg}`, data: { error: msg } });
-        out = `[Error] ${msg}`;
-        break;
+        // Try fallback model
+        const fallbackModels = getHealthyModelList().map(m => m.model).filter(m => m !== this.currentModel);
+        const fallback = fallbackModels[0] || getProviders()[0]?.defaultModel || 'deepseek-chat';
+        this.currentModel = fallback;
+        this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: `Modelo falló, cambiando a: ${fallback}`, data: { error: msg, fallback } });
+        // One more try with fallback
+        try {
+          const resp = await chatCompletion({ model: this.currentModel, messages: msgs, tools, tool_choice: 'auto', temperature: 0.7 },
+            c => { if (c.content) this.stream(c.content); }, ev => { this.currentModel = ev.to; });
+          const tcs = resp.tool_calls?.length ? resp.tool_calls : tryParseTextToolCalls(resp.content);
+          if (tcs?.length) {
+            msgs.push({ role: 'assistant', content: resp.content, tool_calls: tcs });
+            const results = await executeToolsParallel(tcs, (n, a) => this.runTool(n, a));
+            for (const r of results) msgs.push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content.slice(0, 1500) });
+          } else { out = resp.content || 'OK'; break; }
+        } catch (e2) {
+          const msg2 = e2 instanceof Error ? e2.message : String(e2);
+          this.emit({ type: 'action', agent: 'Orchestrator', displayName: 'Cerebro', message: `Error: ${msg2}`, data: { error: msg2 } });
+          out = `[Error] ${msg2}\n\nUsa /model deepseek-chat o /model qwen-plus para cambiar de modelo.`;
+          break;
+        }
       }
     }
 
@@ -562,6 +579,17 @@ export class Orchestrator {
     if (isDelegation && typeof args.task === 'string') {
       const ctxSummary = this.ctx.toPromptContext();
       args.task = args.task + '\n\n' + ctxSummary;
+    }
+
+    // Pass current model to sub-agents so they use the same working model
+    if (isDelegation) {
+      const agentModel = this.currentModel;
+      this.editor.setModel(agentModel);
+      this.librarian.setModel(agentModel);
+      this.basher.setModel(agentModel);
+      this.researcher.setModel(agentModel);
+      this.thinker.setModel(agentModel);
+      this.reviewer.setModel(agentModel);
     }
 
     this.emit({ type: 'action', agent: toolAgent, displayName: displayName(toolAgent), message: toolLabel(name, args), data: args });

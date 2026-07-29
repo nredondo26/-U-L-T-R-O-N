@@ -36,6 +36,8 @@ export abstract class BaseAgent {
     }
   }
 
+  setModel(modelId: string): void { this.config.model = modelId; }
+
   async run(userMessage: string, context?: string): Promise<AgentResult> {
     this.emit({ type: 'thought', agent: this.config.name, message: `Analizando: "${userMessage.slice(0, 80)}"` });
 
@@ -71,9 +73,10 @@ export abstract class BaseAgent {
         );
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        this.emit({ type: 'error', agent: this.config.name, message: `Error en chatCompletion: ${msg}` });
+        const errMsg = `[${this.config.name}] LLM error: ${msg}. Model: ${this.config.model || 'none'}. Try: /model deepseek-chat`;
+        this.emit({ type: 'error', agent: this.config.name, message: errMsg });
         return {
-          content: `Error: ${msg}`,
+          content: errMsg,
           toolCalls: [],
           model: this.config.model || 'unknown',
         };

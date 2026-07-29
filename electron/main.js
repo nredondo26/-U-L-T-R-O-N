@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
-const PORT = 3456;
+const PORT = 3457;
 const SERVER_URL = `http://127.0.0.1:${PORT}`;
 
 let mainWindow = null;
@@ -222,14 +222,32 @@ app.on('ready', async () => {
   ]));
 });
 
+function killServer() {
+  if (serverProcess) {
+    try {
+      // Force kill process tree on Windows
+      const { execSync } = require('child_process');
+      execSync(`taskkill /F /T /PID ${serverProcess.pid} 2>nul`, { timeout: 3000 });
+    } catch {}
+    try { serverProcess.kill('SIGKILL'); } catch {}
+    try { serverProcess.kill(); } catch {}
+    serverProcess = null;
+  }
+}
+
 app.on('window-all-closed', () => {});
 app.on('before-quit', (e) => {
   if (!app.isQuitting) {
     app.isQuitting = true;
     e.preventDefault();
     if (tray) { tray.destroy(); tray = null; }
-    if (serverProcess) { serverProcess.kill(); serverProcess = null; }
-    setTimeout(() => app.exit(0), 1000);
+    killServer();
+    setTimeout(() => app.exit(0), 500);
   }
 });
 app.on('activate', () => { if (mainWindow) mainWindow.show(); else createMainWindow(); });
+
+// Ensure server dies if app exits unexpectedly
+process.on('exit', killServer);
+process.on('SIGINT', () => { killServer(); process.exit(0); });
+process.on('SIGTERM', () => { killServer(); process.exit(0); });

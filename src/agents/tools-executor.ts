@@ -14,6 +14,7 @@ import { createTask, executeTask, smartClick, smartType, openAndFocus, getQueueS
 import { saveToDesktop, saveToFile, checkFile, getDesktopPath } from '../tools/file-ops';
 import { compressOutput } from '../llm/compression/index';
 import { execSync } from 'child_process';
+import { verifyFileWritten, verifyCommand, verifyStrReplace, recordEvidence } from '../tools/evidence';
 import { EditorAgent } from './editor';
 import { LibrarianAgent } from './librarian';
 import { BasherAgent } from './basher';
@@ -107,7 +108,9 @@ async function executeToolOnce(
       return `Nota "${args.name}" lista para guardar. (guardada por el orchestrator)`;
     case 'direct_execute': {
       const result = await executeCommand(args.command as string, projectDir);
-      return `STDOUT:\n${result.stdout || '(vacio)'}\nSTDERR:\n${result.stderr || '(ninguno)'}\nEXIT: ${result.code}`;
+      const evidence = await verifyCommand(args.command as string, projectDir, 0);
+      const status = evidence.state === 'verified' ? '✓' : evidence.state === 'failed' ? `✗ (code: ${result.code})` : '?';
+      return `STDOUT:\n${result.stdout || '(vacio)'}\nSTDERR:\n${result.stderr || '(ninguno)'}\nEXIT: ${result.code} [${status}]`;
     }
     case 'direct_search':
       return webSearch(args.query as string);
@@ -122,7 +125,10 @@ async function executeToolOnce(
     case 'write_file': {
       try {
         fileTools.writeFile(args.filePath as string, args.content as string, projectDir);
-        return `Archivo creado: ${args.filePath}`;
+        // Evidence Gate: verify file after write
+        const evidence = await verifyFileWritten(args.filePath as string, projectDir, args.content as string);
+        const status = evidence.state === 'verified' ? '✓' : '✗';
+        return `Archivo creado: ${args.filePath} [${status}] ${evidence.details}`;
       } catch (e: unknown) {
         return 'Error: ' + (e instanceof Error ? e.message : String(e));
       }
@@ -142,7 +148,10 @@ async function executeToolOnce(
         // Exact match
         if (content.includes(oldStr)) {
           fileTools.writeFile(filePath, content.replace(oldStr, newStr), projectDir);
-          return `Reemplazo exitoso en ${filePath}`;
+          // Evidence Gate: verify replacement
+          const evidence = await verifyStrReplace(filePath, oldStr, newStr, projectDir);
+          const status = evidence.state === 'verified' ? '✓' : '✗';
+          return `Reemplazo exitoso en ${filePath} [${status}] ${evidence.details}`;
         }
 
         // Fuzzy match: try line-by-line
@@ -156,10 +165,13 @@ async function executeToolOnce(
           if (similarity > 0.7) {
             contentLines.splice(i, oldLines.length, ...newStr.split('\n'));
             fileTools.writeFile(filePath, contentLines.join('\n'), projectDir);
-            return `Reemplazo fuzzy (${Math.round(similarity * 100)}% match) en ${filePath}:${i + 1}`;
+            const evidence = await verifyStrReplace(filePath, oldStr, newStr, projectDir);
+            const status = evidence.state === 'verified' ? '✓' : '✗';
+            return `Reemplazo fuzzy (${Math.round(similarity * 100)}% match) en ${filePath}:${i + 1} [${status}]`;
           }
         }
 
+        recordEvidence('file_replace', `Reemplazo fallido en ${filePath}`, 'failed', 'Texto no encontrado', filePath);
         return `No se encontro "${oldStr.slice(0, 80)}..." en ${filePath}. Revisa el texto exacto.`;
       } catch (e: unknown) {
         return 'Error: ' + (e instanceof Error ? e.message : String(e));
