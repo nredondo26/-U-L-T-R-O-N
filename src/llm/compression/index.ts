@@ -1,11 +1,15 @@
-// Tool output compression — lightweight RTK-style pipeline
+// Tool output compression — RTK-style token saver + Ponytail mode + Tier fallback
 
 export type CompressionLevel = 'off' | 'minimal' | 'standard' | 'aggressive';
+export type CompactMode = 'off' | 'lite' | 'full' | 'ultra';
 
 let level: CompressionLevel = 'standard';
+let ponyMode: CompactMode = 'off';
 
 export function setCompressionLevel(l: CompressionLevel): void { level = l; }
 export function getCompressionLevel(): CompressionLevel { return level; }
+export function setPonytailMode(m: CompactMode): void { ponyMode = m; }
+export function getPonytailMode(): CompactMode { return ponyMode; }
 
 // Stats
 let totalBytesBefore = 0;
@@ -19,7 +23,30 @@ export function getStats(): { before: number; after: number; savings: number } {
   };
 }
 
-// Detect command type from tool call name and output
+// Ponytail prompts (senior dev conciso)
+const PONY_PROMPTS: Record<CompactMode, string> = {
+  off: '',
+  lite: '\n\n[MODO CONCISO] Responde directo. Prefiere código sobre explicaciones. stdlib > librerías.',
+  full: '\n\n[MODO SENIOR DEV] Eres un dev senior. Odias el código verbose. YAGNI: no añadas nada no pedido. stdlib > externas. Una línea > varias. Responde solo con código cuando sea posible.',
+  ultra: '\n\n[MODO SENIOR DEV ULTRA] Responde EXCLUSIVAMENTE con código. Cero explicaciones. Cero "aquí está". Cero comentarios. Solo el código más corto posible. Si puedes borrar código en lugar de añadir, hazlo.',
+};
+
+export function getPonytailPrompt(): string { return PONY_PROMPTS[ponyMode]; }
+
+// Detect output type for compression
+function detectType(toolName: string, output: string): string {
+  if (toolName === 'grep') return 'grep';
+  if (toolName === 'read' || toolName === 'read_file') return 'read';
+  const fl = output.split('\n')[0] || '';
+  if (fl.startsWith('diff --git') || output.includes('\n--- a/')) return 'git-diff';
+  if (output.includes('## ') && (output.includes('?? ') || output.includes('M ') || output.includes('A '))) return 'git-status';
+  if (output.match(/^\d+:/m)) return 'grep';
+  if (output.startsWith('D ') || output.startsWith('F ') || output.match(/^[drwxs-]{10}\s+\d+/m)) return 'ls-tree';
+  if (output.startsWith('{') || output.startsWith('[')) return 'json';
+  if (output.match(/^\d{4}[-\/]\d{2}[-\/]\d{2}[T ]\d{2}:\d{2}/)) return 'log';
+  return 'unknown';
+}
+
 function detectCommand(toolName: string, output: string): string {
   if (toolName === 'read' || toolName === 'read_file') return 'read';
   if (toolName === 'grep' || toolName === 'search') return 'grep';
@@ -35,6 +62,31 @@ function detectCommand(toolName: string, output: string): string {
     return 'bash';
   }
   return 'generic';
+}
+
+const MAX_LINES_RTK: Record<string, number> = {
+  'git-diff': 50, 'git-status': 30, 'grep': 40, 'ls-tree': 60,
+  'read': 80, 'json': 30, 'log': 40, 'unknown': 100,
+};
+
+function rtkCompress(output: string, toolName: string): string {
+  const type = detectType(toolName, output);
+  const maxLines = MAX_LINES_RTK[type] || 100;
+  const lines = output.split('\n');
+
+  if (lines.length <= maxLines + 3) return output;
+
+  const head = Math.ceil(maxLines * 0.6);
+  const tail = Math.floor(maxLines * 0.2);
+  const skipped = lines.length - head - tail;
+
+  let result = lines.slice(0, head).join('\n');
+  if (skipped > 0) result += `\n\n[... ${skipped} lines compressed by RTK ...]`;
+  result += '\n' + lines.slice(-tail).join('\n');
+
+  totalBytesBefore += output.length;
+  totalBytesAfter += result.length;
+  return result;
 }
 
 // Filters
@@ -134,51 +186,33 @@ function bashLongFilter(output: string): string {
 export function compressOutput(toolName: string, output: string): string {
   if (level === 'off' || !output) return output;
 
-  if (level === 'minimal') {
-    // Minimal: just strip ANSI + collapse repeats
-    let r = stripAnsi(output);
-    r = collapseRepeats(r);
-    if (r.length < output.length * 0.9) return r;
-    return output;
-  }
-
-  const cmd = detectCommand(toolName, output);
   let result = output;
 
+  // Step 1: Strip ANSI + collapse repeats (always)
+  result = stripAnsi(result);
+  result = collapseRepeats(result);
+
+  // Step 2: RTK smart compression by type
+  result = rtkCompress(result, toolName);
+
+  // Step 3: Filter by specific command
+  const cmd = detectCommand(toolName, output);
   switch (cmd) {
-    case 'npm-install':
-      result = npmInstallFilter(result); break;
-    case 'npm-test':
-      result = testOutputFilter(result); break;
-    case 'git':
-      result = gitFilter(result); break;
-    case 'test-fail':
-      result = testOutputFilter(result); break;
-    case 'ls':
-      result = lsFilter(result); break;
-    case 'bash-long':
-      result = bashLongFilter(result); break;
+    case 'npm-install': result = npmInstallFilter(result); break;
+    case 'npm-test': case 'test-fail': result = testOutputFilter(result); break;
+    case 'git': result = gitFilter(result); break;
+    case 'ls': result = lsFilter(result); break;
+    case 'bash-long': result = bashLongFilter(result); break;
     case 'read':
-      if (output.startsWith('{') || output.startsWith('[')) result = summarizeJsonArray(result);
+      if (result.startsWith('{') || result.startsWith('[')) result = summarizeJsonArray(result);
       break;
-    default:
-      result = stripAnsi(result);
-      result = collapseRepeats(result);
   }
 
-  // Aggressive: additional truncation
-  if (level === 'aggressive') {
-    if (result.length > 5000) result = compressLines(result, 60);
-    else if (result.length > 2000) result = compressLines(result, 100);
-  }
-
-  // Standard truncation for very long output
-  if (level === 'standard' && result.length > 8000) {
-    result = compressLines(result, 120);
-  }
+  // Step 4: Aggressive/standard truncation
+  if (level === 'aggressive' && result.length > 5000) result = compressLines(result, 60);
+  else if (result.length > 8000) result = compressLines(result, 120);
 
   totalBytesBefore += output.length;
   totalBytesAfter += result.length;
-
   return result;
 }

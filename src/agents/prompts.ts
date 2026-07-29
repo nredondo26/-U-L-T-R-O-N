@@ -7,6 +7,7 @@ import * as path from 'path';
 import { ObsidianVault } from '../memory/vault';
 import { SessionMemory } from '../memory/session';
 import type { ConfigStore } from '../shared/config';
+import { getPonytailPrompt } from '../llm/compression/index';
 
 export function buildSystemPrompt(
   vault: ObsidianVault,
@@ -26,6 +27,10 @@ export function buildSystemPrompt(
   if (knowledgeFiles) ctx += knowledgeFiles + '\n\n';
   if (autoContext) ctx += '=== CONOCIMIENTO DEL PROYECTO (grafo indexado) ===\n' + autoContext + '\n\n';
   if (skillsContext) ctx += '=== SKILLS DISPONIBLES ===\n' + skillsContext + '\n\n';
+
+  // Ponytail mode: inject concise prompt
+  const ponyPrompt = getPonytailPrompt();
+  if (ponyPrompt) ctx += ponyPrompt + '\n\n';
 
   return `Eres ULTRON, una IA autonoma.
 
